@@ -1,5 +1,8 @@
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
@@ -18,6 +21,7 @@ const ASTEROID_NAME = "Impactor-2025";
 
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
+    const chartsRef = useRef(null);
 
     const [showAsteroid, setShowAsteroid] = useState(true);
 
@@ -283,6 +287,148 @@ export default function AsteroidImpactDashboard() {
     ]));
 
     const ringsData = [...impactRings, ...explosionRings];
+    // ---- Brand palette as RGB arrays (simpler than hex) ----
+    const C = {
+        BLUE_YONDER:  [46,150,245], // #2E96F5
+        NEON_BLUE:    [9,96,225],   // #0960E1
+        ELECTRIC_BLUE:[0,66,166],   // #0042A6
+        DEEP_BLUE:    [7,23,63],    // #07173F
+        ROCKET_RED:   [228,55,0],   // #E43700
+        MARTIAN_RED:  [142,17,0],   // #8E1100
+        NEON_YELLOW:  [234,254,7],  // #EAFE07
+        WHITE:        [255,255,255]
+    };
+    
+    // quick header band helper
+    function headerBand(doc, title, yTop = 0, bandH = 48) {
+        const W = doc.internal.pageSize.getWidth();
+        doc.setFillColor(...C.DEEP_BLUE);
+        doc.rect(0, yTop, W, bandH, "F");
+        doc.setFillColor(...C.NEON_YELLOW);
+        doc.rect(0, yTop + bandH, W, 4, "F");
+        doc.setTextColor(...C.WHITE);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text(title, 40, yTop + 32);
+    }
+    
+    async function exportPDF() {
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const W = doc.internal.pageSize.getWidth();
+        const H = doc.internal.pageSize.getHeight();
+        const pad = 40;
+    
+        // --- Cover header ---
+        // Taller first band
+        doc.setFillColor(...C.DEEP_BLUE); doc.rect(0, 0, W, 84, "F");
+        doc.setFillColor(...C.NEON_YELLOW); doc.rect(0, 84, W, 6, "F");
+        doc.setTextColor(...C.WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(20);
+        doc.text("Asteroid Impact Report", pad, 50);
+        doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...C.BLUE_YONDER);
+        doc.text(new Date().toLocaleString(), pad, 68);
+    
+        // ---- Scenario summary table ----
+        autoTable(doc, {
+        startY: 110,
+        head: [["Parameter","Value"]],
+        body: [
+            ["Asteroid", "Impactor-2025"],
+            ["Latitude", impact.lat.toFixed(4)],
+            ["Longitude", impact.lng.toFixed(4)],
+            ["Diameter (m)", String(diameterM)],
+            ["Speed (km/s)", String(speedKms)],
+            ["Angle (deg)", String(angleDeg)],
+            ["Hex resolution", String(hexResolution)],
+            ["Strategy", strategy],
+            ...(strategy === "deflection" ? [
+            ["Δv (mm/s)", String(deltaVmm)],
+            ["Lead time (years)", String(leadYears)]
+            ] : []),
+            ...(strategy === "evacuation" ? [
+            ["Evac radius (km)", String(evacRadiusKm)],
+            ["Coverage (%)", String(evacCoverage)]
+            ] : []),
+        ],
+        theme: "grid",
+        styles: {
+            font: "helvetica",
+            fontSize: 10,
+            textColor: C.DEEP_BLUE,
+            lineColor: C.ELECTRIC_BLUE,
+            lineWidth: 0.5,
+            cellPadding: 5,
+        },
+        headStyles: {
+            fillColor: C.DEEP_BLUE,
+            textColor: C.WHITE,
+            lineColor: C.NEON_BLUE,
+            fontStyle: "bold",
+        },
+        margin: { left: pad, right: pad },
+        });
+    
+        // ---- KPI table (row accents) ----
+        autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 18,
+        head: [["Metric","Base","Mitigated"]],
+        body: [
+            ["Affected", kpisBase.pop.toLocaleString(), kpisMit.pop.toLocaleString()],
+            ["Deaths",   kpisBase.deaths.toLocaleString(), kpisMit.deaths.toLocaleString()],
+            ["Severe radius (km)", Math.round(kpisBase.severe), Math.round(kpisMit.severe)],
+            ["Major radius (km)",  Math.round(kpisBase.major),  Math.round(kpisMit.major)],
+            ["Light radius (km)",  Math.round(kpisBase.light),  Math.round(kpisMit.light)],
+        ],
+        theme: "grid",
+        styles: {
+            font: "helvetica",
+            fontSize: 10,
+            textColor: C.DEEP_BLUE,
+            lineColor: C.ELECTRIC_BLUE,
+            lineWidth: 0.5,
+            cellPadding: 5,
+        },
+        headStyles: {
+            fillColor: C.DEEP_BLUE,
+            textColor: C.WHITE,
+            lineColor: C.NEON_BLUE,
+            fontStyle: "bold",
+        },
+        didParseCell: (data) => {
+            if (data.section === "body" && data.row?.raw?.[0] === "Affected" && data.column.index === 0) {
+            data.cell.styles.fillColor = C.BLUE_YONDER;
+            data.cell.styles.textColor = C.WHITE;
+            }
+            if (data.section === "body" && data.row?.raw?.[0] === "Deaths" && data.column.index === 0) {
+            data.cell.styles.fillColor = C.ROCKET_RED;
+            data.cell.styles.textColor = C.WHITE;
+            }
+        },
+        margin: { left: pad, right: pad },
+        });
+    
+        // ---- Charts snapshot page (no points page at all) ----
+        doc.addPage();
+        headerBand(doc, "Effects & Charts");
+        if (chartsRef.current) {
+        const canvas = await html2canvas(chartsRef.current, { scale: 2, backgroundColor: "#111111" });
+        const img = canvas.toDataURL("image/png");
+        const w = W - pad * 2;
+        const h = (canvas.height / canvas.width) * w;
+        doc.addImage(img, "PNG", pad, 66, w, h);
+        }
+    
+        // ---- Footer: page x / y in Neon Blue ----
+        const pages = doc.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+        doc.setPage(i);
+        doc.setTextColor(...C.NEON_BLUE);
+        doc.setFontSize(9);
+        doc.text(`Page ${i} / ${pages}`, W - pad, H - 12, { align: "right" });
+        }
+    
+        doc.save(`impact_report_${Date.now()}.pdf`);
+    }
+    
 
     return (
         <div className="h-screen w-screen bg-neutral-950 text-white overflow-hidden">
@@ -345,10 +491,12 @@ export default function AsteroidImpactDashboard() {
 
             <Panel isOpen={rightOpen} from="right" width={420}>
                 <RightPanel
+                    ref={chartsRef}
                     impact={impact}
                     kpisMit={kpisMit}
                     compareData={compareData}
                     distanceCurve={distanceCurve}
+                    onExportPDF={exportPDF}                  
                 />
             </Panel>
 
