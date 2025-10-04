@@ -1,4 +1,3 @@
-
 import {
     Target, MapPin, ShieldHalf, GitCompare
 } from "lucide-react";
@@ -54,7 +53,7 @@ export function LeftPanel({
                     Trigger Explosion
                 </button>
                 <p className="text-[11px] opacity-70">
-                    Diameter uses cube-root energy scaling: d·v^⅔·sin(θ)^⅓ with type multiplier.
+                    Crater size is estimated using a pi-scaling model.
                 </p>
             </section>
 

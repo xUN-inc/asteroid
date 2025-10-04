@@ -51,33 +51,55 @@ export default function AsteroidImpactDashboard() {
             .catch(() => setCountries([]));
     }, []);
 
-    const computeExplosionRadiusKm = useCallback(({ diameterM, speedKms, angleDeg, type }) => {
-        const EXPLOSION_TYPE_K = {
-            ground: 1.00,
-            airburst: 1.15,
-            water: 0.85,
-        };
-        const C = 0.01970512881800357;
-        const angleRad = (Math.PI / 180) * angleDeg;
-        const base =
-            C *
-            diameterM *
-            Math.cbrt(speedKms * speedKms) *
-            Math.cbrt(Math.max(0, Math.sin(angleRad)));
-        const k = EXPLOSION_TYPE_K[type] ?? 1.0;
+    const computeExplosionRadiusKm = useCallback(() => {
+        // Constants for pi-scaling model
+        const K1 = 0.24;
+        const mu = 0.55;
+        const nu = 0.4;
+        const g = 9.8;
+        const rho_imp = 2700; // Impactor density
+
+        // Target properties vary based on impact surface
+        let Y, rho_target;
+        if (explosionType === 'water') {
+            Y = 0; // Strength of water is negligible
+            rho_target = 1000; // Density of water
+        } else { // 'ground' or 'airburst' are treated as ground impact for crater calculation
+            Y = 1e7; // Target strength for rock (Pa)
+            rho_target = 2750; // Target density for rock (kg/m^3)
+        }
+
+        const d = diameterM;
+        const v = speedKms * 1000; // m/s
+        const theta = angleDeg * (Math.PI / 180); // radians
+
+        const gravity_term = Math.pow((g * d) / (v * v), -mu);
+        const density_term = Math.pow(rho_imp / rho_target, nu);
+        const strength_term = Math.pow(Y / (rho_target * v * v), -mu);
+
+        const full_expression = gravity_term * density_term + strength_term;
+
+        const D_d = K1 * full_expression;
+        const D_vertical = D_d * d; // Crater diameter in meters for a vertical impact
+        const D = D_vertical * Math.pow(Math.sin(theta), 1 / 3); // Adjust for impact angle
+
+        const D_km = D / 1000; // Crater diameter in kilometers
+
         const clampLocal = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-        return clampLocal(base * k, 1, 300);
-    }, []);
+        let radiusKm = D_km / 2;
+
+        // For an airburst, we don't form a crater, but we can estimate a larger damage radius.
+        if (explosionType === 'airburst') {
+            radiusKm *= 1.2; // Increase radius by 20% for wider blast effect
+        }
+
+        return clampLocal(radiusKm, 1, 300);
+    }, [diameterM, speedKms, angleDeg, explosionType]);
 
     const explosionDiameterKm = useMemo(() => {
-        const rKm = computeExplosionRadiusKm({
-            diameterM,
-            speedKms,
-            angleDeg,
-            type: explosionType,
-        });
+        const rKm = computeExplosionRadiusKm();
         return Math.round(rKm * 2);
-    }, [diameterM, speedKms, angleDeg, explosionType, computeExplosionRadiusKm]);
+    }, [computeExplosionRadiusKm]);
 
     const baseR = useMemo(
         () => impactModel({ diameterM, speedKms, angleDeg }),
