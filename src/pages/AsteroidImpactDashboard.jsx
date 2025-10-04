@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import html2canvas from "html2canvas";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
