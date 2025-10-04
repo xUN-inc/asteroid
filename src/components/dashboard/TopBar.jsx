@@ -18,11 +18,12 @@ export function TopBar({ leftOpen, rightOpen, setLeftOpen, setRightOpen, onStart
                         {ASTEROID_NAME}
                     </div>
                     <button
-                        onClick={onStartSimulation}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-emerald-500 text-black text-sm font-semibold hover:bg-emerald-400"
-                    >
-                        <Play className="w-4 h-4" /> Start Simulation
-                    </button>
+  onClick={onStartSimulation}
+  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-red-500 text-white text-sm font-semibold hover:bg-red-400"
+>
+  <Play className="w-4 h-4" /> Start Simulation
+</button>
+
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
