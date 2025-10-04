@@ -86,23 +86,6 @@ export const RightPanel = forwardRef(function RightPanel(
         </button>
       </div>
 
-      {/* Export */}
-      <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Export</div>
-          <button
-            onClick={onExportPDF}
-            disabled={!onExportPDF}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-rose-500 text-white text-sm font-semibold hover:bg-rose-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Export report as PDF"
-          >
-            <FileDown className="w-4 h-4" /> PDF
-          </button>
-        </div>
-        <p className="mt-2 text-xs opacity-70">
-          Exports scenario summary, KPIs, charts snapshot.
-        </p>
-      </section>
 
       {/* Minimap */}
       {showMap && (
@@ -156,6 +139,23 @@ export const RightPanel = forwardRef(function RightPanel(
           <li>Deflection applies reduction based on Δv and lead time.</li>
         </ul>
       </div>
+      {/* Export */}
+      <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">Export</div>
+          <button
+            onClick={onExportPDF}
+            disabled={!onExportPDF}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-rose-500 text-white text-sm font-semibold hover:bg-rose-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Export report as PDF"
+          >
+            <FileDown className="w-4 h-4" /> PDF
+          </button>
+        </div>
+        <p className="mt-2 text-xs opacity-70">
+          Exports scenario summary, KPIs etc.
+        </p>
+      </section>
     </div>
   );
 });
