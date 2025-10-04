@@ -1,3 +1,4 @@
+
 import {
     Target, MapPin, ShieldHalf, GitCompare
 } from "lucide-react";
@@ -43,7 +44,7 @@ export function LeftPanel({
                 />
                 <div className="text-sm mt-2">
                     Computed explosion diameter:&nbsp;
-                    <span className="font-mono">{explosionDiameterKm.toFixed(2)} km</span>
+                    <span className="font-mono">{explosionDiameterKm} km</span>
                     <span className="opacity-70"> (auto from size/speed/angle/type)</span>
                 </div>
                 <button
@@ -53,7 +54,7 @@ export function LeftPanel({
                     Trigger Explosion
                 </button>
                 <p className="text-[11px] opacity-70">
-                    Fireball size is estimated from impact energy.
+                    Diameter uses cube-root energy scaling: d·v^⅔·sin(θ)^⅓ with type multiplier.
                 </p>
             </section>
 
@@ -73,7 +74,7 @@ export function LeftPanel({
                 )}
             </div>
 
-            <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
+            {/* <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                     <ShieldHalf className="w-4 h-4" /> Select Strategy
                 </div>
@@ -102,9 +103,9 @@ export function LeftPanel({
                         <p className="text-xs opacity-70">Note: assumes 70% of losses occur in the severe zone.</p>
                     </div>
                 )}
-            </section>
+            </section> */}
 
-            <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
+            {/* <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                     <GitCompare className="w-4 h-4" /> Show Difference
                 </div>
@@ -123,11 +124,10 @@ export function LeftPanel({
                         <div className="font-medium">Δ (B − A)</div>
                         <div>Deaths: <b className={delta.deaths >= 0 ? "text-red-400" : "text-emerald-400"}>{delta.deaths.toLocaleString()}</b></div>
                         <div>Affected: {delta.pop.toLocaleString()}</div>
-                        <div>Explosion Diam: {delta.explosion} km</div>
                         <div>Radii (km): severe {delta.severe}, major {delta.major}, light {delta.light}</div>
                     </div>
                 )}
-            </section>
+            </section> */}
         </div>
     );
 }

@@ -8,7 +8,7 @@ import { GlobeView } from "../components/dashboard/GlobeView";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
     impactModel, randomPointsAround, estimatePopulation,
-    estimateDeaths, clamp, formatCompact
+    estimateDeaths, clamp
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
 
@@ -51,21 +51,44 @@ export default function AsteroidImpactDashboard() {
             .catch(() => setCountries([]));
     }, []);
 
-    const baseR = useMemo(
-        () => impactModel({ diameterM, speedKms, angleDeg, explosionType }),
-        [diameterM, speedKms, angleDeg, explosionType]
-    );
+    const computeExplosionRadiusKm = useCallback(({ diameterM, speedKms, angleDeg, type }) => {
+        const EXPLOSION_TYPE_K = {
+            ground: 1.00,
+            airburst: 1.15,
+            water: 0.85,
+        };
+        const C = 0.01970512881800357;
+        const angleRad = (Math.PI / 180) * angleDeg;
+        const base =
+            C *
+            diameterM *
+            Math.cbrt(speedKms * speedKms) *
+            Math.cbrt(Math.max(0, Math.sin(angleRad)));
+        const k = EXPLOSION_TYPE_K[type] ?? 1.0;
+        const clampLocal = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+        return clampLocal(base * k, 1, 300);
+    }, []);
 
     const explosionDiameterKm = useMemo(() => {
-        return baseR.fireballRadiusKm * 2;
-    }, [baseR.fireballRadiusKm]);
+        const rKm = computeExplosionRadiusKm({
+            diameterM,
+            speedKms,
+            angleDeg,
+            type: explosionType,
+        });
+        return Math.round(rKm * 2);
+    }, [diameterM, speedKms, angleDeg, explosionType, computeExplosionRadiusKm]);
+
+    const baseR = useMemo(
+        () => impactModel({ diameterM, speedKms, angleDeg }),
+        [diameterM, speedKms, angleDeg]
+    );
 
     const mitigatedR = useMemo(() => {
         if (strategy !== "deflection") return baseR;
         const effectiveness = clamp((deltaVmm / 2) * (leadYears / 2), 0, 3);
         const factor = 1 - Math.min(0.7, 0.18 * effectiveness);
         return {
-            ...baseR,
             severeRadiusKm: baseR.severeRadiusKm * factor,
             majorRadiusKm: baseR.majorRadiusKm * factor,
             lightRadiusKm: baseR.lightRadiusKm * (0.85 + 0.15 * factor),
@@ -141,7 +164,7 @@ export default function AsteroidImpactDashboard() {
             airburst: { colorShock: "#fff176", colorThermal: "#ffffff", speed: 30 },
             water: { colorShock: "#4fd1c5", colorThermal: "#60a5fa", speed: 15 },
         };
-        const radius = Math.max(1, baseR.lightRadiusKm);
+        const radius = Math.max(1, explosionDiameterKm / 2);
         const now = Date.now();
         const style = EXPLOSION_STYLE[explosionType] || EXPLOSION_STYLE.ground;
 
@@ -157,7 +180,7 @@ export default function AsteroidImpactDashboard() {
             ttlMs: 6500,
         };
         setExplosions((prev) => [...prev, newExpl]);
-    }, [baseR.lightRadiusKm, explosionType, impact.lat, impact.lng]);
+    }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
 
     useEffect(() => {
         if (explosions.length === 0) return;
@@ -198,7 +221,6 @@ export default function AsteroidImpactDashboard() {
         impact, diameterM, speedKms, angleDeg,
         strategy, deltaVmm, leadYears, evacRadiusKm, evacCoverage,
         kpis: { base: kpisBase, mit: kpisMit },
-        explosionDiameterKm: explosionDiameterKm,
     });
 
     const cities = useMemo(() => [
@@ -242,7 +264,6 @@ export default function AsteroidImpactDashboard() {
             severe: +(b.severe - a.severe).toFixed(1),
             major: +(b.major - a.major).toFixed(1),
             light: +(b.light - a.light).toFixed(1),
-            explosion: (scenarioB.explosionDiameterKm - scenarioA.explosionDiameterKm).toFixed(2),
         };
     }, [scenarioA, scenarioB]);
 
@@ -316,6 +337,14 @@ export default function AsteroidImpactDashboard() {
                     distanceCurve={distanceCurve}
                 />
             </Panel>
+
+            {/* <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+                <div className="mx-auto max-w-7xl px-4 pb-3 flex gap-2">
+                    <div className="pointer-events-auto rounded-2xl bg-neutral-900/60 border border-white/10 px-3 py-2 text-xs">
+                        Frontend demo • Click globe or country • Integrate NASA/USGS & WorldPop next
+                    </div>
+                </div>
+            </div> */}
         </div>
     );
 }
