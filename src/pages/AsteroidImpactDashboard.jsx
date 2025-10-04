@@ -52,6 +52,10 @@ export default function AsteroidImpactDashboard() {
     const [scenarioA, setScenarioA] = useState(null);
     const [scenarioB, setScenarioB] = useState(null);
 
+
+
+
+
     useEffect(() => {
         const url = "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
         fetch(url)
@@ -215,7 +219,11 @@ export default function AsteroidImpactDashboard() {
         const { lat, lng } = pos;
         setSelectedCountry(null);
         setImpact({ lat, lng });
+
+        // Show asteroid and trigger animation
+        setShowAsteroid(true);
     };
+
     const handleCountryClick = (feat) => {
         const centroid = featureCentroid(feat);
         setSelectedCountry(feat.properties?.name || null);
@@ -324,24 +332,32 @@ export default function AsteroidImpactDashboard() {
             </Panel>
 
             <GlobeView
-                globeRef={globeRef}
-                countries={countries}
-                selectedCountry={selectedCountry}
-                onPolygonClick={handleCountryClick}
-                onGlobeClick={handleGlobeClick}
-                points={points}
-                hexResolution={hexResolution}
-                maxWeight={maxWeight}
-                colorScale={colorScale}
-                ringsData={ringsData}
-                cityLabels={cityLabels}
-                impact={impact}
-            />
+    globeRef={globeRef}
+    countries={countries}
+    selectedCountry={selectedCountry}
+    onPolygonClick={handleCountryClick}
+    onGlobeClick={handleGlobeClick}
+    points={points}
+    hexResolution={hexResolution}
+    maxWeight={maxWeight}
+    colorScale={colorScale}
+    ringsData={ringsData}
+    cityLabels={cityLabels}
+    impact={impact}
+    asteroidData={[{ lat: impact.lat, lng: impact.lng, altitude: 2 }]} // ADD THIS
+/>
 
             <Asteroid
                 globeRef={globeRef}
                 diameterM={diameterM}
                 visible={showAsteroid}
+                impact={impact}  // Pass impact location
+                onImpactComplete={() => {
+                    // Trigger explosion when asteroid arrives
+                    triggerExplosion();
+                    // Optionally hide asteroid after impact
+                    // setTimeout(() => setShowAsteroid(false), 1000);
+                }}
                 onLoaded={(asteroid) => {
                     console.log('Asteroid ready for animation!', asteroid);
                 }}
