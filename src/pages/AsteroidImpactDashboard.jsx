@@ -11,11 +11,15 @@ import {
     estimateDeaths, clamp
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
+import Asteroid from "../components/ui/Asteroid"
 
 const ASTEROID_NAME = "Impactor-2025";
 
+
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
+
+    const [showAsteroid, setShowAsteroid] = useState(true);
 
     const [leftOpen, setLeftOpen] = useState(true);
     const [rightOpen, setRightOpen] = useState(false);
@@ -328,6 +332,16 @@ export default function AsteroidImpactDashboard() {
                 cityLabels={cityLabels}
                 impact={impact}
             />
+
+            <Asteroid
+                globeRef={globeRef}
+                diameterM={diameterM}
+                visible={showAsteroid}
+                onLoaded={(asteroid) => {
+                    console.log('Asteroid ready for animation!', asteroid);
+                }}
+            />
+
 
             <Panel isOpen={rightOpen} from="right" width={420}>
                 <RightPanel
