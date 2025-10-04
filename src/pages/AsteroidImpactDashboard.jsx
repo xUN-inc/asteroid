@@ -5,7 +5,6 @@ import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
 import { RightPanel } from "../components/dashboard/RightPanel";
 import { GlobeView } from "../components/dashboard/GlobeView";
-import DeckMiniMap from "../shared/DeckMinimap";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
     impactModel, randomPointsAround, estimatePopulation,
@@ -20,7 +19,6 @@ export default function AsteroidImpactDashboard() {
 
     const [leftOpen, setLeftOpen] = useState(true);
     const [rightOpen, setRightOpen] = useState(false);
-    const [miniMapOpen, setMiniMapOpen] = useState(true);
 
     const [countries, setCountries] = useState([]);
     const [selectedCountry, setSelectedCountry] = useState(null);
@@ -333,27 +331,20 @@ export default function AsteroidImpactDashboard() {
 
             <Panel isOpen={rightOpen} from="right" width={420}>
                 <RightPanel
+                    impact={impact}
                     kpisMit={kpisMit}
                     compareData={compareData}
                     distanceCurve={distanceCurve}
                 />
             </Panel>
 
-            {miniMapOpen && (
-                <DeckMiniMap
-                    impact={impact}
-                    kpis={{ severe: kpisMit.severe, major: kpisMit.major, light: kpisMit.light }}
-                    onHide={() => setMiniMapOpen(v => !v)}
-                />
-            )}
-
-            <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+            {/* <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
                 <div className="mx-auto max-w-7xl px-4 pb-3 flex gap-2">
                     <div className="pointer-events-auto rounded-2xl bg-neutral-900/60 border border-white/10 px-3 py-2 text-xs">
                         Frontend demo • Click globe or country • Integrate NASA/USGS & WorldPop next
                     </div>
                 </div>
-            </div>
+            </div> */}
         </div>
     );
 }

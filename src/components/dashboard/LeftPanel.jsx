@@ -74,7 +74,7 @@ export function LeftPanel({
                 )}
             </div>
 
-            <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
+            {/* <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                     <ShieldHalf className="w-4 h-4" /> Select Strategy
                 </div>
@@ -103,9 +103,9 @@ export function LeftPanel({
                         <p className="text-xs opacity-70">Note: assumes 70% of losses occur in the severe zone.</p>
                     </div>
                 )}
-            </section>
+            </section> */}
 
-            <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
+            {/* <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                     <GitCompare className="w-4 h-4" /> Show Difference
                 </div>
@@ -127,7 +127,7 @@ export function LeftPanel({
                         <div>Radii (km): severe {delta.severe}, major {delta.major}, light {delta.light}</div>
                     </div>
                 )}
-            </section>
+            </section> */}
         </div>
     );
 }
