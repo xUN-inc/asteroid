@@ -405,6 +405,20 @@ export default function AsteroidImpactDashboard() {
         },
         margin: { left: pad, right: pad },
         });
+
+// ---- Add graph image below tables ----
+const graphImg = new Image();
+graphImg.src = "/image.png"; // your graph image in /public
+await new Promise((resolve) => { graphImg.onload = resolve; });
+
+// Keep aspect ratio
+const aspect = graphImg.width / graphImg.height;
+const imgW = 500;                     // fixed width (adjust as you like)
+const imgH = imgW / aspect;           // auto height
+const x = (W - imgW) / 2;             // center horizontally
+const y = doc.lastAutoTable.finalY + 30; // place after the KPI table
+
+doc.addImage(graphImg, "PNG", x, y, imgW, imgH);
     
     
         // ---- Footer: page x / y in Neon Blue ----
