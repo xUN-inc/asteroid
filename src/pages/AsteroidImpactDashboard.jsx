@@ -406,16 +406,6 @@ export default function AsteroidImpactDashboard() {
         margin: { left: pad, right: pad },
         });
     
-        // ---- Charts snapshot page (no points page at all) ----
-        doc.addPage();
-        headerBand(doc, "Effects & Charts");
-        if (chartsRef.current) {
-        const canvas = await html2canvas(chartsRef.current, { scale: 2, backgroundColor: "#111111" });
-        const img = canvas.toDataURL("image/png");
-        const w = W - pad * 2;
-        const h = (canvas.height / canvas.width) * w;
-        doc.addImage(img, "PNG", pad, 66, w, h);
-        }
     
         // ---- Footer: page x / y in Neon Blue ----
         const pages = doc.getNumberOfPages();
