@@ -75,7 +75,13 @@ export default function AsteroidImpactDashboard() {
 
         const gravity_term = Math.pow((g * d) / (v * v), -mu);
         const density_term = Math.pow(rho_imp / rho_target, nu);
-        const strength_term = Math.pow(Y / (rho_target * v * v), -mu);
+        
+        let strength_term;
+        if (explosionType === 'water') {
+            strength_term = 0;
+        } else {
+            strength_term = Math.pow(Y / (rho_target * v * v), -mu);
+        }
 
         const full_expression = gravity_term * density_term + strength_term;
 
