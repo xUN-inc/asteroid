@@ -42,7 +42,7 @@ export default function Asteroid({
             console.log('🎨 Loading asteroid model, diameter:', diameterM, 'speed:', speedKms);
 
             const loader = new GLTFLoader();
-            
+
             loader.load(
                 '/models/Bennu.glb',
                 (gltf) => {

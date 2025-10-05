@@ -1,20 +1,42 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
+import React, { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
-import { RightPanel } from "../components/dashboard/RightPanel";
-import { GlobeView } from "../components/dashboard/GlobeView";
+// import { RightPanel } from "../components/dashboard/RightPanel";
+// import { GlobeView } from "../components/dashboard/GlobeView";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
     impactModel, randomPointsAround, estimatePopulation,
     estimateDeaths, clamp
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
-import Asteroid from "../components/ui/Asteroid"
+// import Asteroid from "../components/ui/Asteroid"
 import { useAtom, useSetAtom } from "jotai";
 import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
+
+const Asteroid = lazy(() => import("../components/ui/Asteroid"));
+const GlobeView = lazy(() => import("../components/dashboard/GlobeView").then(({ GlobeView }) => ({
+    default: GlobeView
+})));
+
+const RightPanel = lazy(() =>
+    import("../components/dashboard/RightPanel").then(({ RightPanel }) => ({
+        default: RightPanel
+    }))
+);
+
+
+function LoadingFallback({ message }) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <span className="text-neutral-400">{message}</span>
+        </div>
+    );
+}
 
 const ASTEROID_NAME = "Impactor-2025";
 const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
@@ -201,10 +223,10 @@ export default function AsteroidImpactDashboard() {
     // Trigger asteroid animation (button click)
     const triggerExplosion = useCallback(() => {
         console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
-        
+
         // Start asteroid animation
         setAnimationState({ visible: true, isAnimating: true });
-        
+
         // Explosion rings will be created when asteroid hits (via onImpactComplete)
     }, [setAnimationState]);
 
@@ -230,38 +252,45 @@ export default function AsteroidImpactDashboard() {
         setAnimationState({ visible: true, isAnimating: true });
     };
 
-    const handleGlobeClick = (pos) => {
-        const { lat, lng } = pos;
+    const handleGlobeClick = useCallback((pos) => {
         setSelectedCountry(null);
-        setImpact({ lat, lng });
-
-        // Reset asteroid visibility when clicking new location
+        setImpact({ lat: pos.lat, lng: pos.lng });
         setAnimationState({ visible: true, isAnimating: false });
-    };
+    }, [
+        setSelectedCountry, // from useState
+        setImpact,          // from jotai atom
+        setAnimationState   // from jotai atom
+    ]);
 
-    const handleCountryClick = (feat) => {
+    // 2) Memoize handleCountryClick
+    const handleCountryClick = useCallback((feat) => {
         const centroid = featureCentroid(feat);
         setSelectedCountry(feat.properties?.name || null);
         setImpact(centroid);
-
-        // Reset asteroid visibility when clicking new country
         setAnimationState({ visible: true, isAnimating: false });
-    };
+    }, [
+        setSelectedCountry,
+        setImpact,
+        setAnimationState
+    ]);
 
-    const handleDiameterChange = (newDiameter) => {
-    setDiameterM(newDiameter);
-    setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
-};
+    const handleDiameterChange = useCallback((newDiameter) => {
+        setDiameterM(newDiameter);
+        setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
+    }, [setAsteroidParams]);
 
-const handleSpeedChange = (newSpeed) => {
-    setSpeedKms(newSpeed);
-    setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
-};
+    // Speed slider
+    const handleSpeedChange = useCallback((newSpeed) => {
+        setSpeedKms(newSpeed);
+        setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
+    }, [setAsteroidParams]);
 
-const handleAngleChange = (newAngle) => {
-    setAngleDeg(newAngle);
-    setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
-};
+    // Angle slider
+    const handleAngleChange = useCallback((newAngle) => {
+        setAngleDeg(newAngle);
+        setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
+    }, [setAsteroidParams]);
+
 
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
@@ -601,40 +630,43 @@ const handleAngleChange = (newAngle) => {
                     delta={delta}
                 />
             </Panel>
+            <Suspense fallback={<LoadingFallback message="Loading globe..." />}>
+                <GlobeView
+                    globeRef={globeRef}
+                    countries={countries}
+                    selectedCountry={selectedCountry}
+                    onPolygonClick={handleCountryClick}
+                    onGlobeClick={handleGlobeClick}
+                    points={points}
+                    hexResolution={hexResolution}
+                    maxWeight={maxWeight}
+                    colorScale={colorScale}
+                    ringsData={ringsData}
+                    cityLabels={cityLabels}
+                    impact={impact}
+                />
+            </Suspense>
 
-            <GlobeView
-                globeRef={globeRef}
-                countries={countries}
-                selectedCountry={selectedCountry}
-                onPolygonClick={handleCountryClick}
-                onGlobeClick={handleGlobeClick}
-                points={points}
-                hexResolution={hexResolution}
-                maxWeight={maxWeight}
-                colorScale={colorScale}
-                ringsData={ringsData}
-                cityLabels={cityLabels}
-                impact={impact}
-            />
-
-<Asteroid
-                globeRef={globeRef}
-                onImpactComplete={() => {
-                    createExplosionRings(); // Changed from triggerExplosion
-                }}
-                onLoaded={(asteroid) => {
-                    console.log('Asteroid ready!', asteroid);
-                }}
-            />
+            
+            {animationState.visible && (
+                <Suspense fallback={<LoadingFallback message="Loading asteroid…" />}>
+                    <Asteroid
+                        globeRef={globeRef}
+                        onImpactComplete={createExplosionRings}
+                        onLoaded={(asteroid) => console.log("Asteroid ready!", asteroid)}
+                    />
+                </Suspense>
+            )}
 
             <Panel isOpen={rightOpen} from="right" width={420}>
-                <RightPanel
-                    impact={impact}
-                    kpisMit={kpisMit}
-                    compareData={compareData}
-                    distanceCurve={distanceCurve}
-                    onExportPDF={exportPDF}                  
-                />
+                <Suspense fallback={<LoadingFallback message="Loading effects panel…" />}>
+                    <RightPanel
+                        impact={impact}
+                        kpisMit={kpisMit}
+                        compareData={compareData}
+                        distanceCurve={distanceCurve}
+                    />
+                </Suspense>
             </Panel>
         </div>
     );

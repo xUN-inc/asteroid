@@ -17,6 +17,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "framer-motion": "^12.23.12",
+    "gltf-pipeline": "^4.3.0",
     "jotai": "^2.15.0",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
