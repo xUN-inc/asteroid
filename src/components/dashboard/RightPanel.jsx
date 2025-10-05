@@ -25,7 +25,7 @@ function toYMDLocal(d) {
 }
  
 export const RightPanel = forwardRef(function RightPanel(
-  { impact, kpisMit, distanceCurve, onExportPDF },
+  { impact, kpisMit, distanceCurve, onExportPDF, isExportingPDF },
   ref
 ) {
   const today = new Date();
@@ -69,6 +69,7 @@ export const RightPanel = forwardRef(function RightPanel(
     const clamped = clampEnd(start || start0, v);
     setEnd(clamped);
   }
+
   return (
     // Parent can snapshot this entire panel via the forwarded ref
     <div ref={ref} className="space-y-4">
@@ -102,8 +103,8 @@ export const RightPanel = forwardRef(function RightPanel(
       {/* Risk line chart */}
       <RiskLineChart data={distanceCurve} />
  
-{/* Approaches filter */}
-<section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
+      {/* Approaches filter */}
+      <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
         <div className="text-sm font-semibold mb-2">Approaches filter</div>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-[11px] opacity-80">
@@ -126,6 +127,7 @@ export const RightPanel = forwardRef(function RightPanel(
           </label>
         </div>
       </section>
+
       {/* Near-Earth objects list (10 + Load more inside component) */}
       <NearEarthFetch startDate={start} endDate={end} />
  
@@ -138,25 +140,35 @@ export const RightPanel = forwardRef(function RightPanel(
           <li>Deflection applies reduction based on Δv and lead time.</li>
         </ul>
       </div>
+
       {/* Export */}
       <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Export</div>
           <button
             onClick={onExportPDF}
-            disabled={!onExportPDF}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-rose-500 text-white text-sm font-semibold hover:bg-rose-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!onExportPDF || isExportingPDF}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-rose-500 text-white text-sm font-semibold hover:bg-rose-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             title="Export report as PDF"
           >
-            <FileDown className="w-4 h-4" /> PDF
+            {isExportingPDF ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <FileDown className="w-4 h-4" /> PDF
+              </>
+            )}
           </button>
         </div>
         <p className="mt-2 text-xs opacity-70">
-          Exports scenario summary, KPIs etc.
+          {isExportingPDF 
+            ? "Generating PDF with AI recommendations..." 
+            : "Exports scenario summary, KPIs, and AI recommendations."}
         </p>
       </section>
     </div>
   );
 });
- 
- 
