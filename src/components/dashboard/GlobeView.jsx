@@ -15,7 +15,6 @@ export function GlobeView({
     ringsData, 
     cityLabels, 
     impact,
-    asteroidData // NEW PROP
 }) {
     const canWebGL = typeof window !== 'undefined' && 'WebGLRenderingContext' in window;
 
@@ -67,22 +66,6 @@ export function GlobeView({
                         labelDotRadius={() => 0.0}
                         labelColor={() => 'rgba(255,255,255,0.9)'}
                         labelResolution={2}
-
-                        // ADD ASTEROID AS CUSTOM LAYER
-                        customLayerData={asteroidData}
-                        customThreeObject={(d) => {
-                            console.log('🎨 Creating asteroid object for:', d);
-                            const obj = new THREE.Mesh(
-                                new THREE.BoxGeometry(20, 20, 20),
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 })
-                            );
-                            return obj;
-                        }}
-                        customThreeObjectUpdate={(obj, d) => {
-                            console.log('📍 Updating asteroid position:', d);
-                            // react-globe.gl handles the coordinate conversion!
-                            Object.assign(obj.position, globeRef.current.getCoords(d.lat, d.lng, d.altitude));
-                        }}
 
                         atmosphereColor="#88bbff"
                         atmosphereAltitude={0.18}

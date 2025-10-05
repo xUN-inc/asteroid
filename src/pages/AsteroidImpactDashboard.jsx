@@ -339,7 +339,6 @@ export default function AsteroidImpactDashboard() {
     ringsData={ringsData}
     cityLabels={cityLabels}
     impact={impact}
-    asteroidData={[{ lat: impact.lat, lng: impact.lng, altitude: 2 }]} // ADD THIS
 />
 
             <Asteroid
