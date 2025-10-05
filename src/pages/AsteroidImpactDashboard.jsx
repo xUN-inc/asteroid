@@ -327,6 +327,7 @@ export default function AsteroidImpactDashboard() {
             kpisBase, // Calculated object
             kpisMit,  // Calculated object
             strategy,
+            impact,
         };
 
         try {
@@ -354,7 +355,7 @@ export default function AsteroidImpactDashboard() {
             console.error("Failed to fetch AI recommendations:", error);
             return `Error: Could not connect to backend or API. Check console for details. (${error.message})`;
         }
-    }, [diameterM, speedKms, angleDeg, kpisBase, kpisMit, strategy]);
+    }, [diameterM, speedKms, angleDeg, kpisBase, kpisMit, strategy, impact]);
     // -------------------------------------------------------------------
 
     
