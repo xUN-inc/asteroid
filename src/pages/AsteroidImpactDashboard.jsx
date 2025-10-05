@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
@@ -13,15 +11,18 @@ import {
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
 import Asteroid from "../components/ui/Asteroid"
+import { useAtom, useSetAtom } from "jotai";
+import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
 
 const ASTEROID_NAME = "Impactor-2025";
 const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
 
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
-    const chartsRef = useRef(null);
 
-    const [showAsteroid, setShowAsteroid] = useState(true);
+    const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
+
+    const setAsteroidParams = useSetAtom(asteroidParamsAtom);
 
     const [leftOpen, setLeftOpen] = useState(true);
     const [rightOpen, setRightOpen] = useState(false);
@@ -30,7 +31,8 @@ export default function AsteroidImpactDashboard() {
     const [selectedCountry, setSelectedCountry] = useState(null);
     const [showLabels, setShowLabels] = useState(false);
 
-    const [impact, setImpact] = useState({ lat: 40.0, lng: 29.0 });
+    const [impact, setImpact] = useAtom(impactAtom);
+
     const [diameterM, setDiameterM] = useState(200);
     const [speedKms, setSpeedKms] = useState(19);
     const [angleDeg, setAngleDeg] = useState(45);
@@ -170,7 +172,8 @@ export default function AsteroidImpactDashboard() {
         globeRef.current.pointOfView({ lat: impact.lat, lng: impact.lng, altitude: 1.7 }, 1200);
     }, [impact]);
 
-    const triggerExplosion = useCallback(() => {
+    // Create explosion rings (visual effect only)
+    const createExplosionRings = useCallback(() => {
         const EXPLOSION_STYLE = {
             ground: { colorShock: "#ff3b2f", colorThermal: "#ffa500", speed: 20 },
             airburst: { colorShock: "#fff176", colorThermal: "#ffffff", speed: 30 },
@@ -194,6 +197,16 @@ export default function AsteroidImpactDashboard() {
         setExplosions((prev) => [...prev, newExpl]);
     }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
 
+    // Trigger asteroid animation (button click)
+    const triggerExplosion = useCallback(() => {
+        console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
+        
+        // Start asteroid animation
+        setAnimationState({ visible: true, isAnimating: true });
+        
+        // Explosion rings will be created when asteroid hits (via onImpactComplete)
+    }, [setAnimationState]);
+
     useEffect(() => {
         if (explosions.length === 0) return;
         const t = setInterval(() => {
@@ -211,19 +224,43 @@ export default function AsteroidImpactDashboard() {
             setAngleDeg(preset.angleDeg);
         }
         setRightOpen(true);
-        triggerExplosion();
+
+        // Start asteroid animation
+        setAnimationState({ visible: true, isAnimating: true });
     };
 
     const handleGlobeClick = (pos) => {
         const { lat, lng } = pos;
         setSelectedCountry(null);
         setImpact({ lat, lng });
+
+        // Reset asteroid visibility when clicking new location
+        setAnimationState({ visible: true, isAnimating: false });
     };
+
     const handleCountryClick = (feat) => {
         const centroid = featureCentroid(feat);
         setSelectedCountry(feat.properties?.name || null);
         setImpact(centroid);
+
+        // Reset asteroid visibility when clicking new country
+        setAnimationState({ visible: true, isAnimating: false });
     };
+
+    const handleDiameterChange = (newDiameter) => {
+    setDiameterM(newDiameter);
+    setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
+};
+
+const handleSpeedChange = (newSpeed) => {
+    setSpeedKms(newSpeed);
+    setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
+};
+
+const handleAngleChange = (newAngle) => {
+    setAngleDeg(newAngle);
+    setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
+};
 
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
@@ -544,9 +581,9 @@ export default function AsteroidImpactDashboard() {
 
             <Panel isOpen={leftOpen} from="left" width={320}>
                 <LeftPanel
-                    diameterM={diameterM} setDiameterM={setDiameterM}
-                    speedKms={speedKms} setSpeedKms={setSpeedKms}
-                    angleDeg={angleDeg} setAngleDeg={setAngleDeg}
+                    diameterM={diameterM} setDiameterM={handleDiameterChange}
+                    speedKms={speedKms} setSpeedKms={handleSpeedChange}
+                    angleDeg={angleDeg} setAngleDeg={handleAngleChange}
                     hexResolution={hexResolution} setHexResolution={setHexResolution}
                     kpisBase={kpisBase}
                     explosionType={explosionType} setExplosionType={setExplosionType}
@@ -581,17 +618,16 @@ export default function AsteroidImpactDashboard() {
 
             <Asteroid
                 globeRef={globeRef}
-                diameterM={diameterM}
-                visible={showAsteroid}
+                onImpactComplete={() => {
+                    createExplosionRings(); // Changed from triggerExplosion
+                }}
                 onLoaded={(asteroid) => {
-                    console.log('Asteroid ready for animation!', asteroid);
+                    console.log('Asteroid ready!', asteroid);
                 }}
             />
 
-
             <Panel isOpen={rightOpen} from="right" width={420}>
                 <RightPanel
-                    ref={chartsRef}
                     impact={impact}
                     kpisMit={kpisMit}
                     compareData={compareData}
@@ -599,14 +635,6 @@ export default function AsteroidImpactDashboard() {
                     onExportPDF={exportPDF}                  
                 />
             </Panel>
-
-            {/* <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
-                <div className="mx-auto max-w-7xl px-4 pb-3 flex gap-2">
-                    <div className="pointer-events-auto rounded-2xl bg-neutral-900/60 border border-white/10 px-3 py-2 text-xs">
-                        Frontend demo • Click globe or country • Integrate NASA/USGS & WorldPop next
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 }

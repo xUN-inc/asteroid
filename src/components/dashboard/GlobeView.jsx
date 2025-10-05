@@ -1,8 +1,21 @@
-
 import React from 'react';
 import Globe from 'react-globe.gl';
+import * as THREE from 'three';
 
-export function GlobeView({ globeRef, countries, selectedCountry, onPolygonClick, onGlobeClick, points, hexResolution, maxWeight, colorScale, ringsData, cityLabels, impact }) {
+export function GlobeView({ 
+    globeRef, 
+    countries, 
+    selectedCountry, 
+    onPolygonClick, 
+    onGlobeClick, 
+    points, 
+    hexResolution, 
+    maxWeight, 
+    colorScale, 
+    ringsData, 
+    cityLabels, 
+    impact,
+}) {
     const canWebGL = typeof window !== 'undefined' && 'WebGLRenderingContext' in window;
 
     return (
@@ -10,6 +23,7 @@ export function GlobeView({ globeRef, countries, selectedCountry, onPolygonClick
             {canWebGL ? (
                 <>
                     <Globe
+                        key="single-globe-instance"
                         ref={globeRef}
                         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
                         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
