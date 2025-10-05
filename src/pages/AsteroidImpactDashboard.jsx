@@ -1,18 +1,24 @@
+
 import React, { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Zap } from "lucide-react";
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
+// import { RightPanel } from "../components/dashboard/RightPanel";
+// import { GlobeView } from "../components/dashboard/GlobeView";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
     impactModel, randomPointsAround, estimatePopulation,
     estimateDeaths, clamp
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
+// import Asteroid from "../components/ui/Asteroid"
 import { useAtom, useSetAtom } from "jotai";
 import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
-import { useIsMobile } from "../utils/useIsMobile";
 
 const Asteroid = lazy(() => import("../components/ui/Asteroid"));
 const GlobeView = lazy(() => import("../components/dashboard/GlobeView").then(({ GlobeView }) => ({
@@ -25,6 +31,7 @@ const RightPanel = lazy(() =>
     }))
 );
 
+
 function LoadingFallback({ message }) {
     return (
         <div className="flex items-center justify-center h-full">
@@ -34,13 +41,56 @@ function LoadingFallback({ message }) {
 }
 
 const ASTEROID_NAME = "Impactor-2025";
-const BACKEND_URL = "http://localhost:3001";
+const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
+
+
+function FloatingExplosionButton({ 
+  visible, 
+  onTrigger, 
+  selectedCountry 
+}: { 
+  visible: boolean; 
+  onTrigger: () => void; 
+  selectedCountry: string | null;
+}) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30"
+        >
+          <button
+            onClick={onTrigger}
+            className="group relative px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white font-bold rounded-full shadow-2xl flex items-center gap-3 transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation"
+          >
+            <span className="absolute inset-0 rounded-full bg-red-500 opacity-0 group-hover:opacity-30 blur-xl transition-opacity duration-300" />
+            
+            <Zap className="w-5 h-5 animate-pulse" />
+            
+            <div className="flex flex-col items-start">
+              <span className="text-sm leading-none">Trigger Explosion</span>
+              {selectedCountry && (
+                <span className="text-xs opacity-90 leading-none mt-1">
+                  at {selectedCountry}
+                </span>
+              )}
+            </div>
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
 export default function AsteroidImpactDashboard() {
-    const isMobile = useIsMobile();
     const globeRef = useRef(null);
     
     const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
+
     const setAsteroidParams = useSetAtom(asteroidParamsAtom);
 
     const [leftOpen, setLeftOpen] = useState(true);
@@ -69,6 +119,12 @@ export default function AsteroidImpactDashboard() {
 
     const [scenarioA, setScenarioA] = useState(null);
     const [scenarioB, setScenarioB] = useState(null);
+    
+    // We can keep these states for displaying the report in the UI if needed later, 
+    // but for the PDF download, we'll fetch the data inside exportPDF.
+    const [aiReport, setAiReport] = useState(null); 
+    const [isGenerating, setIsGenerating] = useState(false); 
+
 
     useEffect(() => {
         const url = "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
@@ -209,9 +265,14 @@ export default function AsteroidImpactDashboard() {
         setExplosions((prev) => [...prev, newExpl]);
     }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
     
+    // Trigger asteroid animation (button click)
     const triggerExplosion = useCallback(() => {
         console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
+
+        // Start asteroid animation
         setAnimationState({ visible: true, isAnimating: true });
+
+        // Explosion rings will be created when asteroid hits (via onImpactComplete)
     }, [setAnimationState]);
 
     useEffect(() => {
@@ -231,6 +292,8 @@ export default function AsteroidImpactDashboard() {
             setAngleDeg(preset.angleDeg);
         }
         setRightOpen(true);
+
+        // Start asteroid animation
         setAnimationState({ visible: true, isAnimating: true });
     };
 
@@ -238,50 +301,41 @@ export default function AsteroidImpactDashboard() {
         setSelectedCountry(null);
         setImpact({ lat: pos.lat, lng: pos.lng });
         setAnimationState({ visible: true, isAnimating: false });
-    }, [setSelectedCountry, setImpact, setAnimationState]);
+    }, [
+        setSelectedCountry, // from useState
+        setImpact,          // from jotai atom
+        setAnimationState   // from jotai atom
+    ]);
 
+    // 2) Memoize handleCountryClick
     const handleCountryClick = useCallback((feat) => {
         const centroid = featureCentroid(feat);
         setSelectedCountry(feat.properties?.name || null);
         setImpact(centroid);
         setAnimationState({ visible: true, isAnimating: false });
-    }, [setSelectedCountry, setImpact, setAnimationState]);
+    }, [
+        setSelectedCountry,
+        setImpact,
+        setAnimationState
+    ]);
 
     const handleDiameterChange = useCallback((newDiameter) => {
         setDiameterM(newDiameter);
         setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
     }, [setAsteroidParams]);
 
+    // Speed slider
     const handleSpeedChange = useCallback((newSpeed) => {
         setSpeedKms(newSpeed);
         setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
     }, [setAsteroidParams]);
 
+    // Angle slider
     const handleAngleChange = useCallback((newAngle) => {
         setAngleDeg(newAngle);
         setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
     }, [setAsteroidParams]);
 
-    // Mobile panel handlers - only one panel open at a time on mobile
-    const handleLeftPanelToggle = useCallback(() => {
-        setLeftOpen(prev => {
-            const newState = !prev;
-            if (isMobile && newState) {
-                setRightOpen(false);
-            }
-            return newState;
-        });
-    }, [isMobile]);
-
-    const handleRightPanelToggle = useCallback(() => {
-        setRightOpen(prev => {
-            const newState = !prev;
-            if (isMobile && newState) {
-                setLeftOpen(false);
-            }
-            return newState;
-        });
-    }, [isMobile]);
 
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
@@ -349,25 +403,41 @@ export default function AsteroidImpactDashboard() {
     ]));
 
     const ringsData = [...impactRings, ...explosionRings];
-
+    // ---- Brand palette as RGB arrays (simpler than hex) ----
     const C = {
-        BLUE_YONDER:  [46,150,245],
-        NEON_BLUE:    [9,96,225],
-        ELECTRIC_BLUE:[0,66,166],
-        DEEP_BLUE:    [7,23,63],
-        ROCKET_RED:   [228,55,0],
-        MARTIAN_RED:  [142,17,0],
-        NEON_YELLOW:  [234,254,7],
-        WHITE:        [255,255,255]
+        BLUE_YONDER:  [46,150,245], // #2E96F5
+        NEON_BLUE:    [9,96,225],   // #0960E1
+        ELECTRIC_BLUE:[0,66,166],   // #0042A6
+        DEEP_BLUE:    [7,23,63],    // #07173F
+        ROCKET_RED:   [228,55,0],   // #E43700
+        MARTIAN_RED:  [142,17,0],   // #8E1100
+        NEON_YELLOW:  [234,254,7],  // #EAFE07
+        WHITE:        [255,255,255]
     };
+    
+    // quick header band helper
+    function headerBand(doc, title, yTop = 0, bandH = 48) {
+        const W = doc.internal.pageSize.getWidth();
+        doc.setFillColor(...C.DEEP_BLUE);
+        doc.rect(0, yTop, W, bandH, "F");
+        doc.setFillColor(...C.NEON_YELLOW);
+        doc.rect(0, yTop + bandH, W, 4, "F");
+        doc.setTextColor(...C.WHITE);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text(title, 40, yTop + 32);
+    }
 
+    // -------------------------------------------------------------------
+    // NEW HELPER FUNCTION TO FETCH AI REPORT
+    // -------------------------------------------------------------------
     const fetchAiReport = useCallback(async () => {
         const postData = {
             diameterM,
             speedKms,
             angleDeg,
-            kpisBase,
-            kpisMit,
+            kpisBase, // Calculated object
+            kpisMit,  // Calculated object
             strategy,
             impact,
         };
@@ -398,8 +468,13 @@ export default function AsteroidImpactDashboard() {
             return `Error: Could not connect to backend or API. Check console for details. (${error.message})`;
         }
     }, [diameterM, speedKms, angleDeg, kpisBase, kpisMit, strategy, impact]);
+    // -------------------------------------------------------------------
 
+    
     async function exportPDF() {
+        // --- 1. START GENERATING REPORT (Optional: Display a loading toast/spinner here) ---
+        // For simplicity, we are not setting state here to avoid rerenders during PDF generation.
+        
         let aiReportText = "AI Report Generation Failed.";
         try {
             aiReportText = await fetchAiReport();
@@ -407,171 +482,173 @@ export default function AsteroidImpactDashboard() {
             console.error("Critical error during AI report fetch for PDF:", e);
         }
         
+        // --- 2. PROCEED WITH PDF GENERATION ---
         const doc = new jsPDF({ unit: "pt", format: "a4" });
         const W = doc.internal.pageSize.getWidth();
         const H = doc.internal.pageSize.getHeight();
         const pad = 40;
-
-        doc.setFillColor(...C.DEEP_BLUE); 
-        doc.rect(0, 0, W, 84, "F");
-        doc.setFillColor(...C.NEON_YELLOW); 
-        doc.rect(0, 84, W, 6, "F");
-        doc.setTextColor(...C.WHITE); 
-        doc.setFont("helvetica","bold"); 
-        doc.setFontSize(20);
+    
+        // --- Cover header ---
+        doc.setFillColor(...C.DEEP_BLUE); doc.rect(0, 0, W, 84, "F");
+        doc.setFillColor(...C.NEON_YELLOW); doc.rect(0, 84, W, 6, "F");
+        doc.setTextColor(...C.WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(20);
         doc.text("Asteroid Impact Report", pad, 50);
-        doc.setFont("helvetica","normal"); 
-        doc.setFontSize(10); 
-        doc.setTextColor(...C.BLUE_YONDER);
+        doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...C.BLUE_YONDER);
         doc.text(new Date().toLocaleString(), pad, 68);
-
+    
+        // ---- Scenario summary table ----
         autoTable(doc, {
-            startY: 110,
-            head: [["Parameter","Value"]],
-            body: [
-                ["Asteroid", "Impactor-2025"],
-                ["Latitude", impact.lat.toFixed(4)],
-                ["Longitude", impact.lng.toFixed(4)],
-                ["Diameter (m)", String(diameterM)],
-                ["Speed (km/s)", String(speedKms)],
-                ["Angle (deg)", String(angleDeg)],
-                ["Hex resolution", String(hexResolution)],
-                ["Strategy", strategy],
-                ...(strategy === "deflection" ? [
-                    ["Δv (mm/s)", String(deltaVmm)],
-                    ["Lead time (years)", String(leadYears)]
-                ] : []),
-                ...(strategy === "evacuation" ? [
-                    ["Evac radius (km)", String(evacRadiusKm)],
-                    ["Coverage (%)", String(evacCoverage)]
-                ] : []),
-            ],
-            theme: "grid",
-            styles: {
-                font: "helvetica",
-                fontSize: 10,
-                textColor: C.DEEP_BLUE,
-                lineColor: C.ELECTRIC_BLUE,
-                lineWidth: 0.5,
-                cellPadding: 5,
-            },
-            headStyles: {
-                fillColor: C.DEEP_BLUE,
-                textColor: C.WHITE,
-                lineColor: C.NEON_BLUE,
-                fontStyle: "bold",
-            },
-            margin: { left: pad, right: pad },
+        startY: 110,
+        head: [["Parameter","Value"]],
+        body: [
+            ["Asteroid", "Impactor-2025"],
+            ["Latitude", impact.lat.toFixed(4)],
+            ["Longitude", impact.lng.toFixed(4)],
+            ["Diameter (m)", String(diameterM)],
+            ["Speed (km/s)", String(speedKms)],
+            ["Angle (deg)", String(angleDeg)],
+            ["Hex resolution", String(hexResolution)],
+            ["Strategy", strategy],
+            ...(strategy === "deflection" ? [
+            ["Δv (mm/s)", String(deltaVmm)],
+            ["Lead time (years)", String(leadYears)]
+            ] : []),
+            ...(strategy === "evacuation" ? [
+            ["Evac radius (km)", String(evacRadiusKm)],
+            ["Coverage (%)", String(evacCoverage)]
+            ] : []),
+        ],
+        theme: "grid",
+        styles: {
+            font: "helvetica",
+            fontSize: 10,
+            textColor: C.DEEP_BLUE,
+            lineColor: C.ELECTRIC_BLUE,
+            lineWidth: 0.5,
+            cellPadding: 5,
+        },
+        headStyles: {
+            fillColor: C.DEEP_BLUE,
+            textColor: C.WHITE,
+            lineColor: C.NEON_BLUE,
+            fontStyle: "bold",
+        },
+        margin: { left: pad, right: pad },
+        });
+    
+        // ---- KPI table (row accents) ----
+        autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 18,
+        head: [["Metric","Base","Mitigated"]],
+        body: [
+            ["Affected", kpisBase.pop.toLocaleString(), kpisMit.pop.toLocaleString()],
+            ["Deaths",   kpisBase.deaths.toLocaleString(), kpisMit.deaths.toLocaleString()],
+            ["Severe radius (km)", Math.round(kpisBase.severe), Math.round(kpisMit.severe)],
+            ["Major radius (km)",  Math.round(kpisBase.major),  Math.round(kpisMit.major)],
+            ["Light radius (km)",  Math.round(kpisBase.light),  Math.round(kpisMit.light)],
+        ],
+        theme: "grid",
+        styles: {
+            font: "helvetica",
+            fontSize: 10,
+            textColor: C.DEEP_BLUE,
+            lineColor: C.ELECTRIC_BLUE,
+            lineWidth: 0.5,
+            cellPadding: 5,
+        },
+        headStyles: {
+            fillColor: C.DEEP_BLUE,
+            textColor: C.WHITE,
+            lineColor: C.NEON_BLUE,
+            fontStyle: "bold",
+        },
+        didParseCell: (data) => {
+            if (data.section === "body" && data.row?.raw?.[0] === "Affected" && data.column.index === 0) {
+            data.cell.styles.fillColor = C.BLUE_YONDER;
+            data.cell.styles.textColor = C.WHITE;
+            }
+            if (data.section === "body" && data.row?.raw?.[0] === "Deaths" && data.column.index === 0) {
+            data.cell.styles.fillColor = C.ROCKET_RED;
+            data.cell.styles.textColor = C.WHITE;
+            }
+        },
+        margin: { left: pad, right: pad },
         });
 
-        autoTable(doc, {
-            startY: doc.lastAutoTable.finalY + 18,
-            head: [["Metric","Base","Mitigated"]],
-            body: [
-                ["Affected", kpisBase.pop.toLocaleString(), kpisMit.pop.toLocaleString()],
-                ["Deaths",   kpisBase.deaths.toLocaleString(), kpisMit.deaths.toLocaleString()],
-                ["Severe radius (km)", Math.round(kpisBase.severe), Math.round(kpisMit.severe)],
-                ["Major radius (km)",  Math.round(kpisBase.major),  Math.round(kpisMit.major)],
-                ["Light radius (km)",  Math.round(kpisBase.light),  Math.round(kpisMit.light)],
-            ],
-            theme: "grid",
-            styles: {
-                font: "helvetica",
-                fontSize: 10,
-                textColor: C.DEEP_BLUE,
-                lineColor: C.ELECTRIC_BLUE,
-                lineWidth: 0.5,
-                cellPadding: 5,
-            },
-            headStyles: {
-                fillColor: C.DEEP_BLUE,
-                textColor: C.WHITE,
-                lineColor: C.NEON_BLUE,
-                fontStyle: "bold",
-            },
-            didParseCell: (data) => {
-                if (data.section === "body" && data.row?.raw?.[0] === "Affected" && data.column.index === 0) {
-                    data.cell.styles.fillColor = C.BLUE_YONDER;
-                    data.cell.styles.textColor = C.WHITE;
-                }
-                if (data.section === "body" && data.row?.raw?.[0] === "Deaths" && data.column.index === 0) {
-                    data.cell.styles.fillColor = C.ROCKET_RED;
-                    data.cell.styles.textColor = C.WHITE;
-                }
-            },
-            margin: { left: pad, right: pad },
-        });
+    // ---- Add graph image below tables ----
+    const graphImg = new Image();
+    graphImg.src = "/image.png"; // your graph image in /public
+    await new Promise((resolve) => { graphImg.onload = resolve; });
 
-        const graphImg = new Image();
-        graphImg.src = "/image.png";
-        await new Promise((resolve) => { graphImg.onload = resolve; });
+    // Keep aspect ratio
+    const aspect = graphImg.width / graphImg.height;
+    const imgW = 500;                     // fixed width (adjust as you like)
+    const imgH = imgW / aspect;           // auto height
+    let y = doc.lastAutoTable.finalY + 30; // place after the KPI table
+    const x = (W - imgW) / 2;             // center horizontally
 
-        const aspect = graphImg.width / graphImg.height;
-        const imgW = 500;
-        const imgH = imgW / aspect;
-        let y = doc.lastAutoTable.finalY + 30;
-        const x = (W - imgW) / 2;
+    // Check if image fits on the current page, if not, add a new page
+    if (y + imgH > H - 50) {
+        doc.addPage();
+        y = 50; // New page starting point
+    }
+    
+    doc.addImage(graphImg, "PNG", x, y, imgW, imgH);
+    y = y + imgH + 30; // Update Y for the next section
 
-        if (y + imgH > H - 50) {
+    // -------------------------------------------------------------------
+    // PDF INTEGRATION FOR AI REPORT (Using the fetched aiReportText)
+    // -------------------------------------------------------------------
+    if (aiReportText) {
+        // Add a new page for the AI Report if content is getting too long
+        if (y > H - 100) {
             doc.addPage();
             y = 50;
         }
-        
-        doc.addImage(graphImg, "PNG", x, y, imgW, imgH);
-        y = y + imgH + 30;
 
-        if (aiReportText) {
-            if (y > H - 100) {
+        headerBand(doc, "AI Mitigation Recommendations", y - 20, 48); // Custom header
+        y += 40; // Adjust after header band
+        
+        doc.setFontSize(10);
+        doc.setTextColor(...C.DEEP_BLUE);
+        doc.setFont("helvetica", "normal");
+        
+        const reportLines = doc.splitTextToSize(aiReportText, W - 2 * pad);
+        
+        let currentY = y;
+        
+        reportLines.forEach((line) => {
+            if (currentY > H - 50) { // Check for page overflow
                 doc.addPage();
-                y = 50;
+                currentY = 50;
             }
+            doc.text(line, pad, currentY);
+            currentY += 14; // Line height
+        });
 
-            doc.setFillColor(...C.DEEP_BLUE);
-            doc.rect(0, y - 20, W, 48, "F");
-            doc.setFillColor(...C.NEON_YELLOW);
-            doc.rect(0, y - 20 + 48, W, 4, "F");
-            doc.setTextColor(...C.WHITE);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(16);
-            doc.text("AI Mitigation Recommendations", pad, y + 12);
-            y += 40;
-            
-            doc.setFontSize(10);
-            doc.setTextColor(...C.DEEP_BLUE);
-            doc.setFont("helvetica", "normal");
-            
-            const reportLines = doc.splitTextToSize(aiReportText, W - 2 * pad);
-            
-            let currentY = y;
-            
-            reportLines.forEach((line) => {
-                if (currentY > H - 50) {
-                    doc.addPage();
-                    currentY = 50;
-                }
-                doc.text(line, pad, currentY);
-                currentY += 14;
-            });
-        }
+    }
+    // -------------------------------------------------------------------
         
+        // ---- Footer: page x / y in Neon Blue ----
         const pages = doc.getNumberOfPages();
         for (let i = 1; i <= pages; i++) {
-            doc.setPage(i);
-            doc.setTextColor(...C.NEON_BLUE);
-            doc.setFontSize(9);
-            doc.text(`Page ${i} / ${pages}`, W - pad, H - 12, { align: "right" });
+        doc.setPage(i);
+        doc.setTextColor(...C.NEON_BLUE);
+        doc.setFontSize(9);
+        doc.text(`Page ${i} / ${pages}`, W - pad, H - 12, { align: "right" });
         }
     
         doc.save(`impact_report_${Date.now()}.pdf`);
     }
+    
 
     return (
-        <div className="h-screen w-screen bg-neutral-950 text-white overflow-hidden">
+        <div className="h-screen w-screen bg-neutral-950 text-white overflow-hidden fixed inset-0">
             <TopBar
                 leftOpen={leftOpen}
                 rightOpen={rightOpen}
-                setLeftOpen={handleLeftPanelToggle}
-                setRightOpen={handleRightPanelToggle}
+                setLeftOpen={setLeftOpen}
+                setRightOpen={setRightOpen}
                 onStartSimulation={onStartSimulation}
                 showLabels={showLabels}
                 setShowLabels={setShowLabels}
@@ -579,39 +656,25 @@ export default function AsteroidImpactDashboard() {
 
             <Panel isOpen={leftOpen} from="left" width={320}>
                 <LeftPanel
-                    diameterM={diameterM} 
-                    setDiameterM={handleDiameterChange}
-                    speedKms={speedKms} 
-                    setSpeedKms={handleSpeedChange}
-                    angleDeg={angleDeg} 
-                    setAngleDeg={handleAngleChange}
-                    hexResolution={hexResolution} 
-                    setHexResolution={setHexResolution}
+                    diameterM={diameterM} setDiameterM={handleDiameterChange}
+                    speedKms={speedKms} setSpeedKms={handleSpeedChange}
+                    angleDeg={angleDeg} setAngleDeg={handleAngleChange}
+                    hexResolution={hexResolution} setHexResolution={setHexResolution}
                     kpisBase={kpisBase}
-                    explosionType={explosionType} 
-                    setExplosionType={setExplosionType}
+                    explosionType={explosionType} setExplosionType={setExplosionType}
                     explosionDiameterKm={explosionDiameterKm}
                     triggerExplosion={triggerExplosion}
-                    impact={impact} 
-                    selectedCountry={selectedCountry}
-                    strategy={strategy} 
-                    setStrategy={setStrategy}
-                    deltaVmm={deltaVmm} 
-                    setDeltaVmm={setDeltaVmm}
-                    leadYears={leadYears} 
-                    setLeadYears={setLeadYears}
-                    evacRadiusKm={evacRadiusKm} 
-                    setEvacRadiusKm={setEvacRadiusKm}
-                    evacCoverage={evacCoverage} 
-                    setEvacCoverage={setEvacCoverage}
-                    saveScenarioA={saveScenarioA} 
-                    saveScenarioB={saveScenarioB}
-                    scenarioA={scenarioA} 
-                    scenarioB={scenarioB}
+                    impact={impact} selectedCountry={selectedCountry}
+                    strategy={strategy} setStrategy={setStrategy}
+                    deltaVmm={deltaVmm} setDeltaVmm={setDeltaVmm}
+                    leadYears={leadYears} setLeadYears={setLeadYears}
+                    evacRadiusKm={evacRadiusKm} setEvacRadiusKm={setEvacRadiusKm}
+                    evacCoverage={evacCoverage} setEvacCoverage={setEvacCoverage}
+                    saveScenarioA={saveScenarioA} saveScenarioB={saveScenarioB}
+                    scenarioA={scenarioA} scenarioB={scenarioB}
                     delta={delta}
                 />
             </Panel>
-
             <Suspense fallback={<LoadingFallback message="Loading globe..." />}>
                 <GlobeView
                     globeRef={globeRef}
@@ -629,6 +692,7 @@ export default function AsteroidImpactDashboard() {
                 />
             </Suspense>
 
+            
             {animationState.visible && (
                 <Suspense fallback={<LoadingFallback message="Loading asteroid…" />}>
                     <Asteroid
@@ -646,7 +710,6 @@ export default function AsteroidImpactDashboard() {
                         kpisMit={kpisMit}
                         compareData={compareData}
                         distanceCurve={distanceCurve}
-                        onExportPDF={exportPDF}
                     />
                 </Suspense>
             </Panel>
