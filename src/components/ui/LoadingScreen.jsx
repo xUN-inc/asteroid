@@ -3,7 +3,8 @@ import React from 'react';
 import { Zap } from 'lucide-react';
 
 
-export function LoadingScreen({ progress = 0, message = 'Initializing dashboard' }){
+
+export function LoadingScreen({ progress = 0, message = 'Initializing dashboard' }) {
   return (
     <div className="fixed inset-0 z-[10000] bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 flex flex-col items-center justify-center">
       {/* Animated background stars */}
