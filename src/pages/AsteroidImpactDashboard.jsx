@@ -20,6 +20,9 @@ import { ASTEROID_PRESETS } from "../utils/presets";
 import { useAtom, useSetAtom } from "jotai";
 import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
 
+import { useIsMobile } from "../utils/useIsMobile";
+import { LoadingScreen } from "../components/ui/LoadingScreen";
+
 const Asteroid = lazy(() => import("../components/ui/Asteroid"));
 const GlobeView = lazy(() => import("../components/dashboard/GlobeView").then(({ GlobeView }) => ({
     default: GlobeView
@@ -53,41 +56,45 @@ function FloatingExplosionButton({
   onTrigger: () => void; 
   selectedCountry: string | null;
 }) {
+  if (!visible) return null;
+
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30"
-        >
-          <button
-            onClick={onTrigger}
-            className="group relative px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white font-bold rounded-full shadow-2xl flex items-center gap-3 transition-all duration-200 hover:scale-105 active:scale-95 touch-manipulation"
-          >
-            <span className="absolute inset-0 rounded-full bg-red-500 opacity-0 group-hover:opacity-30 blur-xl transition-opacity duration-300" />
-            
-            <Zap className="w-5 h-5 animate-pulse" />
-            
-            <div className="flex flex-col items-start">
-              <span className="text-sm leading-none">Trigger Explosion</span>
-              {selectedCountry && (
-                <span className="text-xs opacity-90 leading-none mt-1">
-                  at {selectedCountry}
-                </span>
-              )}
-            </div>
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div
+      className="fixed bottom-20 sm:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-slide-up"
+      style={{ zIndex: 9999 }}
+    >
+      <button
+        onClick={onTrigger}
+        className="group relative px-5 py-3 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 active:from-red-700 active:to-orange-600 text-white font-bold rounded-full shadow-[0_8px_32px_rgba(239,68,68,0.6)] flex items-center gap-2 transition-all duration-200 touch-manipulation"
+      >
+        <span className="absolute -inset-2 rounded-full bg-red-500 opacity-30 blur-xl group-hover:opacity-40 transition-opacity" />
+        
+        <Zap className="w-5 h-5 animate-pulse relative z-10" />
+        
+        <div className="flex flex-col items-start relative z-10">
+          <span className="text-sm leading-none font-bold">
+            Trigger Explosion
+          </span>
+          {selectedCountry && (
+            <span className="text-xs opacity-90 leading-none mt-1">
+              at {selectedCountry}
+            </span>
+          )}
+        </div>
+      </button>
+    </div>
   );
 }
 
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
+
+    const isMobile = useIsMobile();
+
+    // Loading state
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadProgress, setLoadProgress] = useState(0);
+    const [loadMessage, setLoadMessage] = useState('Initializing dashboard');
     
     const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
 
@@ -124,6 +131,26 @@ export default function AsteroidImpactDashboard() {
     // but for the PDF download, we'll fetch the data inside exportPDF.
     const [aiReport, setAiReport] = useState(null); 
     const [isGenerating, setIsGenerating] = useState(false); 
+
+    useEffect(() => {
+        const stages = [
+            { progress: 20, message: 'Loading globe data', delay: 200 },
+            { progress: 40, message: 'Preparing 3D models', delay: 500 },
+            { progress: 60, message: 'Loading geospatial data', delay: 800 },
+            { progress: 80, message: 'Initializing simulation', delay: 1100 },
+            { progress: 100, message: 'Ready!', delay: 1300 },
+        ];
+
+        stages.forEach(({ progress, message, delay }) => {
+            setTimeout(() => {
+                setLoadProgress(progress);
+                setLoadMessage(message);
+                if (progress === 100) {
+                    setTimeout(() => setIsLoading(false), 500);
+                }
+            }, delay);
+        });
+    }, []);
 
 
     useEffect(() => {
@@ -235,6 +262,28 @@ export default function AsteroidImpactDashboard() {
             return { d: Math.round(d), blast: +(blast.toFixed(2)), thermal: +(term.toFixed(2)) };
         });
     }, [kpisBase.light, kpisBase.severe]);
+
+    const handleLeftPanelToggle = useCallback((open) => {
+    if (isMobile && open) {
+        // On mobile, close right panel when opening left
+        setRightOpen(false);
+    }
+    setLeftOpen(open);
+}, [isMobile]);
+
+const handleRightPanelToggle = useCallback((open) => {
+    if (isMobile && open) {
+        // On mobile, close left panel when opening right
+        setLeftOpen(false);
+    }
+    setRightOpen(open);
+}, [isMobile]);
+
+// Add this computed value near your other useMemo hooks
+const hasSelectedLocation = useMemo(() => {
+    return selectedCountry !== null || 
+           (impact.lat !== 40.0 || impact.lng !== 29.0); // Default location check
+}, [selectedCountry, impact.lat, impact.lng]);
 
     useEffect(() => {
         if (!globeRef.current) return;
@@ -641,14 +690,17 @@ export default function AsteroidImpactDashboard() {
         doc.save(`impact_report_${Date.now()}.pdf`);
     }
     
+  if (isLoading) {
+        return <LoadingScreen progress={loadProgress} message={loadMessage} />;
+    }
 
     return (
         <div className="h-screen w-screen bg-neutral-950 text-white overflow-hidden fixed inset-0">
             <TopBar
                 leftOpen={leftOpen}
                 rightOpen={rightOpen}
-                setLeftOpen={setLeftOpen}
-                setRightOpen={setRightOpen}
+                setLeftOpen={handleLeftPanelToggle}  // ← Use mobile-aware handler
+                setRightOpen={handleRightPanelToggle} // ← Use mobile-aware handler
                 onStartSimulation={onStartSimulation}
                 showLabels={showLabels}
                 setShowLabels={setShowLabels}
@@ -675,6 +727,7 @@ export default function AsteroidImpactDashboard() {
                     delta={delta}
                 />
             </Panel>
+
             <Suspense fallback={<LoadingFallback message="Loading globe..." />}>
                 <GlobeView
                     globeRef={globeRef}
@@ -692,7 +745,6 @@ export default function AsteroidImpactDashboard() {
                 />
             </Suspense>
 
-            
             {animationState.visible && (
                 <Suspense fallback={<LoadingFallback message="Loading asteroid…" />}>
                     <Asteroid
@@ -713,6 +765,13 @@ export default function AsteroidImpactDashboard() {
                     />
                 </Suspense>
             </Panel>
+
+            {/* Floating explosion button */}
+            <FloatingExplosionButton 
+                visible={hasSelectedLocation && !animationState.isAnimating}
+                onTrigger={triggerExplosion}
+                selectedCountry={selectedCountry}
+            />
         </div>
     );
 }
