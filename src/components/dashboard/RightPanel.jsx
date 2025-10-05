@@ -4,9 +4,9 @@ import { Stat } from "../../shared/Stat";
 import { RiskLineChart } from "../../shared/RiskLineChart";
 import DeckMiniMap from "../../shared/DeckMinimap";
 import NearEarthFetch from "../../shared/NearEarthFetch";
-
+ 
 const MS_DAY = 86_400_000;
-
+ 
 // Safe date helpers (no toISOString on invalid dates)
 function parseYMD(str) {
   if (typeof str !== "string") return null;
@@ -23,7 +23,7 @@ function toYMDLocal(d) {
   const day = String(dt.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
+ 
 export const RightPanel = forwardRef(function RightPanel(
   { impact, kpisMit, distanceCurve, onExportPDF },
   ref
@@ -31,11 +31,11 @@ export const RightPanel = forwardRef(function RightPanel(
   const today = new Date();
   const start0 = toYMDLocal(today);
   const end0 = toYMDLocal(new Date(today.getTime() + 7 * MS_DAY));
-
+ 
   const [showMap, setShowMap] = useState(true);
   const [start, setStart] = useState(start0);
   const [end, setEnd] = useState(end0);
-
+ 
   // clamp end to [start, start+7d]
   function clampEnd(startStr, endStr) {
     const s = parseYMD(startStr) ?? new Date();
@@ -46,7 +46,7 @@ export const RightPanel = forwardRef(function RightPanel(
     if (e > max) e = max;
     return toYMDLocal(e);
   }
-
+ 
   function handleStartChange(v) {
     // allow clearing while typing without crashing
     if (!v) {
@@ -59,7 +59,7 @@ export const RightPanel = forwardRef(function RightPanel(
     setStart(toYMDLocal(s));
     setEnd((prev) => clampEnd(toYMDLocal(s), prev));
   }
-
+ 
   function handleEndChange(v) {
     if (!v) {
       // user cleared; keep UI valid by snapping to start (no crash)
@@ -69,7 +69,6 @@ export const RightPanel = forwardRef(function RightPanel(
     const clamped = clampEnd(start || start0, v);
     setEnd(clamped);
   }
-
   return (
     // Parent can snapshot this entire panel via the forwarded ref
     <div ref={ref} className="space-y-4">
@@ -85,24 +84,24 @@ export const RightPanel = forwardRef(function RightPanel(
           {showMap ? "Hide map" : "Show map"}
         </button>
       </div>
-
-
+ 
+ 
       {/* Minimap */}
       {showMap && (
         <div className="h-64 rounded-2xl overflow-hidden border border-white/10">
           <DeckMiniMap impact={impact} kpis={kpisMit} />
         </div>
       )}
-
+ 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-2">
         <Stat title="Affected population" value={kpisMit.pop} />
         <Stat title="Estimated deaths" value={kpisMit.deaths} emphasize />
       </div>
-
+ 
       {/* Risk line chart */}
       <RiskLineChart data={distanceCurve} />
-
+ 
 {/* Approaches filter */}
 <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
         <div className="text-sm font-semibold mb-2">Approaches filter</div>
@@ -129,7 +128,7 @@ export const RightPanel = forwardRef(function RightPanel(
       </section>
       {/* Near-Earth objects list (10 + Load more inside component) */}
       <NearEarthFetch startDate={start} endDate={end} />
-
+ 
       <div className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3 text-xs leading-relaxed">
         <div className="font-medium mb-1">Assumptions</div>
         <ul className="list-disc pl-5 space-y-1 opacity-80">
@@ -159,3 +158,5 @@ export const RightPanel = forwardRef(function RightPanel(
     </div>
   );
 });
+ 
+ 
