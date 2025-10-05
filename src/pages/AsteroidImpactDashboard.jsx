@@ -16,9 +16,9 @@ import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/
 
 const Asteroid = lazy(() => import("../components/ui/Asteroid"));
 const RightPanel = lazy(() =>
-  import("../components/dashboard/RightPanel").then(({ RightPanel }) => ({
-    default: RightPanel
-  }))
+    import("../components/dashboard/RightPanel").then(({ RightPanel }) => ({
+        default: RightPanel
+    }))
 );
 
 
@@ -239,39 +239,46 @@ export default function AsteroidImpactDashboard() {
         setAnimationState({ visible: true, isAnimating: true });
     };
 
-    const handleGlobeClick = (pos) => {
-        const { lat, lng } = pos;
+    const handleGlobeClick = useCallback((pos) => {
         setSelectedCountry(null);
-        setImpact({ lat, lng });
-
-        // Reset asteroid visibility when clicking new location
+        setImpact({ lat: pos.lat, lng: pos.lng });
         setAnimationState({ visible: true, isAnimating: false });
-    };
+    }, [
+        setSelectedCountry, // from useState
+        setImpact,          // from jotai atom
+        setAnimationState   // from jotai atom
+    ]);
 
-    const handleCountryClick = (feat) => {
+    // 2) Memoize handleCountryClick
+    const handleCountryClick = useCallback((feat) => {
         const centroid = featureCentroid(feat);
         setSelectedCountry(feat.properties?.name || null);
         setImpact(centroid);
-
-        // Reset asteroid visibility when clicking new country
         setAnimationState({ visible: true, isAnimating: false });
-    };
+    }, [
+        setSelectedCountry,
+        setImpact,
+        setAnimationState
+    ]);
 
-    const handleDiameterChange = (newDiameter) => {
+    const handleDiameterChange = useCallback((newDiameter) => {
         setDiameterM(newDiameter);
         setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
-    };
+    }, [setAsteroidParams]);
 
-    const handleSpeedChange = (newSpeed) => {
+    // Speed slider
+    const handleSpeedChange = useCallback((newSpeed) => {
         setSpeedKms(newSpeed);
         setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
-    };
+    }, [setAsteroidParams]);
 
-    const handleAngleChange = (newAngle) => {
+    // Angle slider
+    const handleAngleChange = useCallback((newAngle) => {
         setAngleDeg(newAngle);
         setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
-    };
+    }, [setAsteroidParams]);
 
+    
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
     const snapshotScenario = (label) => ({
