@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
-import { RightPanel } from "../components/dashboard/RightPanel";
+// import { RightPanel } from "../components/dashboard/RightPanel";
 import { GlobeView } from "../components/dashboard/GlobeView";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
@@ -10,9 +10,25 @@ import {
     estimateDeaths, clamp
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
-import Asteroid from "../components/ui/Asteroid"
+// import Asteroid from "../components/ui/Asteroid"
 import { useAtom, useSetAtom } from "jotai";
 import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
+
+const Asteroid = lazy(() => import("../components/ui/Asteroid"));
+const RightPanel = lazy(() =>
+  import("../components/dashboard/RightPanel").then(({ RightPanel }) => ({
+    default: RightPanel
+  }))
+);
+
+
+function LoadingFallback({ message }) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <span className="text-neutral-400">{message}</span>
+        </div>
+    );
+}
 
 const ASTEROID_NAME = "Impactor-2025";
 
@@ -194,10 +210,10 @@ export default function AsteroidImpactDashboard() {
     // Trigger asteroid animation (button click)
     const triggerExplosion = useCallback(() => {
         console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
-        
+
         // Start asteroid animation
         setAnimationState({ visible: true, isAnimating: true });
-        
+
         // Explosion rings will be created when asteroid hits (via onImpactComplete)
     }, [setAnimationState]);
 
@@ -242,19 +258,19 @@ export default function AsteroidImpactDashboard() {
     };
 
     const handleDiameterChange = (newDiameter) => {
-    setDiameterM(newDiameter);
-    setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
-};
+        setDiameterM(newDiameter);
+        setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
+    };
 
-const handleSpeedChange = (newSpeed) => {
-    setSpeedKms(newSpeed);
-    setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
-};
+    const handleSpeedChange = (newSpeed) => {
+        setSpeedKms(newSpeed);
+        setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
+    };
 
-const handleAngleChange = (newAngle) => {
-    setAngleDeg(newAngle);
-    setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
-};
+    const handleAngleChange = (newAngle) => {
+        setAngleDeg(newAngle);
+        setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
+    };
 
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
@@ -372,23 +388,25 @@ const handleAngleChange = (newAngle) => {
                 impact={impact}
             />
 
-            <Asteroid
-                globeRef={globeRef}
-                onImpactComplete={() => {
-                    createExplosionRings(); // Changed from triggerExplosion
-                }}
-                onLoaded={(asteroid) => {
-                    console.log('Asteroid ready!', asteroid);
-                }}
-            />
+            {animationState.visible && (
+                <Suspense fallback={<LoadingFallback message="Loading asteroid…" />}>
+                    <Asteroid
+                        globeRef={globeRef}
+                        onImpactComplete={createExplosionRings}
+                        onLoaded={(asteroid) => console.log("Asteroid ready!", asteroid)}
+                    />
+                </Suspense>
+            )}
 
             <Panel isOpen={rightOpen} from="right" width={420}>
-                <RightPanel
-                    impact={impact}
-                    kpisMit={kpisMit}
-                    compareData={compareData}
-                    distanceCurve={distanceCurve}
-                />
+                <Suspense fallback={<LoadingFallback message="Loading effects panel…" />}>
+                    <RightPanel
+                        impact={impact}
+                        kpisMit={kpisMit}
+                        compareData={compareData}
+                        distanceCurve={distanceCurve}
+                    />
+                </Suspense>
             </Panel>
         </div>
     );
