@@ -44,7 +44,7 @@ function LoadingFallback({ message }) {
 }
 
 const ASTEROID_NAME = "Impactor-2025";
-const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:3001";
 
 
 function FloatingExplosionButton({ visible,

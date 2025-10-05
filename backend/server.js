@@ -1,17 +1,23 @@
+// backend/index.js
 const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
 require("dotenv").config();
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
-// Assuming OPENAI_API_KEY is correctly set in your .env file
+// Ensure the OpenAI API key is set
+if (!process.env.OPENAI_API_KEY) {
+  console.error("❌ ERROR: OPENAI_API_KEY not set in environment");
+  process.exit(1);
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-app.use(cors());
+app.use(cors({ origin: "*" })); // adjust origins in production
 app.use(express.json());
 
 // Helper function to format numbers cleanly
@@ -20,10 +26,22 @@ const safeNum = (val, digits = 0) =>
     ? val.toLocaleString(undefined, { maximumFractionDigits: digits })
     : "N/A";
 
-app.post("/api/generate-recommendations", async (req, res) => {
+// Input validation middleware
+const validateInput = (req, res, next) => {
+  const { diameterM, speedKms, angleDeg } = req.body;
+  if (!diameterM || !speedKms || !angleDeg) {
+    return res.status(400).json({
+      success: false,
+      error: "Missing required fields: diameterM, speedKms, angleDeg",
+    });
+  }
+  next();
+};
+
+// Main API route
+app.post("/api/generate-recommendations", validateInput, async (req, res) => {
   const { diameterM, speedKms, angleDeg, kpisBase, kpisMit, strategy, impact } = req.body;
 
-  // Safety check for impact location
   const lat = impact?.lat || "N/A";
   const lng = impact?.lng || "N/A";
 
@@ -52,48 +70,46 @@ Proposed Mitigation Strategy:
 
 Instructions:
 Based on the data and the inferred location, generate a detailed report with the following four sections. 
-DO NOT use Markdown formatting (no asterisks, underscores, or hashes). 
-Write section titles as plain text followed by a colon. 
-Use simple sentences and line breaks for readability.
+DO NOT use Markdown formatting. Write section titles as plain text followed by line breaks.
 
 1. Geospatial & Industrial Risk Assessment:
     - Specific Location: State the inferred Country, City, and the provided Lat/Lng.
-    - Industry List: Based on the location, list 3-4 specific industrial sectors (e.g., Oil Refinery, Major International Airport, Chemical Storage Facility) within the damage radius. If possible, list a plausible major company/entity that operates in that area.
-    - Secondary Hazard: Analyze how damage to these industries could intensify the crisis (e.g., secondary fire, toxic plume).
-    - Preventive Measures: List 3 immediate, specific preventive measures for these industries.
+    - Industry List: 3-4 industrial sectors within the damage radius. Include plausible major companies/entities.
+    - Secondary Hazard: Analyze how damage could intensify the crisis.
+    - Preventive Measures: List 3 immediate measures.
 
 2. Deflection Strategy & Targeting:
-    - Optimal Deflection Direction: Recommend an optimal deflection direction (e.g., North, South, East, West) and a safe target zone (e.g., Mid-Pacific, Siberian Tundra, Sahara Desert).
-    - Justification: Explain the chosen target area based on maximizing ocean/uninhabited land impact and minimizing population risk.
-    - Technical Challenge: Provide a high-level comment on the technical challenge (low/medium/high difficulty) of the required delta-V to achieve this deflection.
+    - Optimal Deflection Direction: Recommend deflection direction and safe target zone.
+    - Justification: Explain chosen target area based on minimizing population risk.
+    - Technical Challenge: Comment on technical difficulty of required delta-V.
 
 3. Tiered Response by Damage Radius:
-    - Severe Radius (${safeNum(kpisBase?.severe, 1)} km): Top 3-4 actions focused on evacuation and survival.
-    - Major Radius (${safeNum(kpisBase?.major, 1)} km): Top 3-4 actions focused on emergency services mobilization and critical infrastructure securing.
-    - Light Radius (${safeNum(kpisBase?.light, 1)} km): Top 3-4 actions focused on public health alerts, communication, and resource staging.
+    - Severe Radius (${safeNum(kpisBase?.severe, 1)} km): Top 3-4 actions for evacuation and survival.
+    - Major Radius (${safeNum(kpisBase?.major, 1)} km): Top 3-4 actions for emergency services and infrastructure.
+    - Light Radius (${safeNum(kpisBase?.light, 1)} km): Top 3-4 actions for public health alerts and communication.
 
 4. Long-Term Strategic Planning:
-    - What are the top 2 actions if we have Long Lead Time (> 5 years)? (Focus on planetary defense investment and large-scale fragmentation/deflection).
-    - What are the top 2 actions if we have Short Lead Time (< 6 months)? (Focus on mass casualty prep and maximizing self-evacuation).
-    - If the size were >1 km (a Mega-Impactor), what is the single most critical global action? (Focus on civilizational preservation).
+    - Long Lead Time (>5 years): Top 2 actions for planetary defense.
+    - Short Lead Time (<6 months): Top 2 actions for mass casualty prep.
+    - Mega-Impactor (>1 km): Single most critical global action.
 
-Keep the entire response under 500 words.
+Keep the response under 500 words.
 `;
 
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-4o-mini", // fast and cost-effective
+      model: "gpt-4o-mini",
     });
 
     let recommendations = completion.choices[0].message.content;
 
-    // 🔑 Post-processing: remove all markdown-style symbols for clean text
+    // Remove markdown symbols for clean text
     recommendations = recommendations
-      .replace(/\*\*(.*?)\*\*/g, "$1") // remove bold **
-      .replace(/\*(.*?)\*/g, "$1")     // remove italic *
-      .replace(/_(.*?)_/g, "$1")       // remove underscores
-      .replace(/#+\s/g, "");           // remove markdown headers
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/_(.*?)_/g, "$1")
+      .replace(/#+\s/g, "");
 
     res.json({
       success: true,
@@ -102,11 +118,17 @@ Keep the entire response under 500 words.
       },
     });
   } catch (error) {
-    console.error("Error calling OpenAI API:", error);
-    res.status(500).json({ success: false, error: "Failed to generate recommendations" });
+    console.error("❌ Error calling OpenAI API:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to generate recommendations",
+      details: error.message,
+    });
   }
 });
 
+// Start server
 app.listen(port, () => {
   console.log(`✅ Backend running at http://localhost:${port}`);
+  console.log(`🌐 API endpoint: http://localhost:${port}/api/generate-recommendations`);
 });
