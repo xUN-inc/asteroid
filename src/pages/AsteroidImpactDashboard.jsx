@@ -8,7 +8,7 @@ import { GlobeView } from "../components/dashboard/GlobeView";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
     impactModel, randomPointsAround, estimatePopulation,
-    estimateDeaths, clamp
+    estimateDeaths, clamp, formatCompact
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
 
@@ -51,72 +51,21 @@ export default function AsteroidImpactDashboard() {
             .catch(() => setCountries([]));
     }, []);
 
-    const computeExplosionRadiusKm = useCallback(() => {
-        // Constants for pi-scaling model
-        const K1 = 0.24;
-        const mu = 0.55;
-        const nu = 0.4;
-        const g = 9.8;
-        const rho_imp = 2700; // Impactor density
-
-        // Target properties vary based on impact surface
-        let Y, rho_target;
-        if (explosionType === 'water') {
-            Y = 0; // Strength of water is negligible
-            rho_target = 1000; // Density of water
-        } else { // 'ground' or 'airburst' are treated as ground impact for crater calculation
-            Y = 1e7; // Target strength for rock (Pa)
-            rho_target = 2750; // Target density for rock (kg/m^3)
-        }
-
-        const d = diameterM;
-        const v = speedKms * 1000; // m/s
-        const theta = angleDeg * (Math.PI / 180); // radians
-
-        const gravity_term = Math.pow((g * d) / (v * v), -mu);
-        const density_term = Math.pow(rho_imp / rho_target, nu);
-        
-        let strength_term;
-        if (explosionType === 'water') {
-            strength_term = 0;
-        } else {
-            strength_term = Math.pow(Y / (rho_target * v * v), -mu);
-        }
-
-        const full_expression = gravity_term * density_term + strength_term;
-
-        const D_d = K1 * full_expression;
-        const D_vertical = D_d * d; // Crater diameter in meters for a vertical impact
-        const D = D_vertical * Math.pow(Math.sin(theta), 1 / 3); // Adjust for impact angle
-
-        const D_km = D / 1000; // Crater diameter in kilometers
-
-        const clampLocal = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-        let radiusKm = D_km / 2;
-
-        // For an airburst, we don't form a crater, but we can estimate a larger damage radius.
-        if (explosionType === 'airburst') {
-            radiusKm *= 1.2; // Increase radius by 20% for wider blast effect
-        }
-
-        return clampLocal(radiusKm, 1, 300);
-    }, [diameterM, speedKms, angleDeg, explosionType]);
+    const baseR = useMemo(
+        () => impactModel({ diameterM, speedKms, angleDeg, explosionType }),
+        [diameterM, speedKms, angleDeg, explosionType]
+    );
 
     const explosionDiameterKm = useMemo(() => {
-        const rKm = computeExplosionRadiusKm();
-        return Math.round(rKm * 2);
-    }, [computeExplosionRadiusKm]);
-
-    const baseR = useMemo(
-        () => impactModel({ diameterM, speedKms, angleDeg }),
-        [diameterM, speedKms, angleDeg]
-    );
+        return baseR.fireballRadiusKm * 2;
+    }, [baseR.fireballRadiusKm]);
 
     const mitigatedR = useMemo(() => {
         if (strategy !== "deflection") return baseR;
         const effectiveness = clamp((deltaVmm / 2) * (leadYears / 2), 0, 3);
         const factor = 1 - Math.min(0.7, 0.18 * effectiveness);
         return {
+            ...baseR,
             severeRadiusKm: baseR.severeRadiusKm * factor,
             majorRadiusKm: baseR.majorRadiusKm * factor,
             lightRadiusKm: baseR.lightRadiusKm * (0.85 + 0.15 * factor),
@@ -192,7 +141,7 @@ export default function AsteroidImpactDashboard() {
             airburst: { colorShock: "#fff176", colorThermal: "#ffffff", speed: 30 },
             water: { colorShock: "#4fd1c5", colorThermal: "#60a5fa", speed: 15 },
         };
-        const radius = Math.max(1, explosionDiameterKm / 2);
+        const radius = Math.max(1, baseR.lightRadiusKm);
         const now = Date.now();
         const style = EXPLOSION_STYLE[explosionType] || EXPLOSION_STYLE.ground;
 
@@ -208,7 +157,7 @@ export default function AsteroidImpactDashboard() {
             ttlMs: 6500,
         };
         setExplosions((prev) => [...prev, newExpl]);
-    }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
+    }, [baseR.lightRadiusKm, explosionType, impact.lat, impact.lng]);
 
     useEffect(() => {
         if (explosions.length === 0) return;
@@ -249,6 +198,7 @@ export default function AsteroidImpactDashboard() {
         impact, diameterM, speedKms, angleDeg,
         strategy, deltaVmm, leadYears, evacRadiusKm, evacCoverage,
         kpis: { base: kpisBase, mit: kpisMit },
+        explosionDiameterKm: explosionDiameterKm,
     });
 
     const cities = useMemo(() => [
@@ -292,6 +242,7 @@ export default function AsteroidImpactDashboard() {
             severe: +(b.severe - a.severe).toFixed(1),
             major: +(b.major - a.major).toFixed(1),
             light: +(b.light - a.light).toFixed(1),
+            explosion: (scenarioB.explosionDiameterKm - scenarioA.explosionDiameterKm).toFixed(2),
         };
     }, [scenarioA, scenarioB]);
 
@@ -365,14 +316,6 @@ export default function AsteroidImpactDashboard() {
                     distanceCurve={distanceCurve}
                 />
             </Panel>
-
-            {/* <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
-                <div className="mx-auto max-w-7xl px-4 pb-3 flex gap-2">
-                    <div className="pointer-events-auto rounded-2xl bg-neutral-900/60 border border-white/10 px-3 py-2 text-xs">
-                        Frontend demo • Click globe or country • Integrate NASA/USGS & WorldPop next
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 }
