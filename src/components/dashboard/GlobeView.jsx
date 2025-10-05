@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
-import * as THREE from 'three';
 
 export function GlobeView({ 
     globeRef, 
@@ -17,14 +16,42 @@ export function GlobeView({
     impact,
 }) {
     const canWebGL = typeof window !== 'undefined' && 'WebGLRenderingContext' in window;
+    const containerRef = useRef(null);
+    const [dimensions, setDimensions] = useState({
+        width: window.innerWidth,
+        height: window.innerHeight
+    });
+
+    // Handle window resize
+    useEffect(() => {
+        const handleResize = () => {
+            setDimensions({
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+        };
+        
+        // Listen for resize events
+        window.addEventListener('resize', handleResize);
+        
+        // Trigger initial resize after a short delay to ensure proper initialization
+        const timer = setTimeout(handleResize, 100);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(timer);
+        };
+    }, []);
 
     return (
-        <div className="absolute inset-0">
+        <div ref={containerRef} className="absolute inset-0">
             {canWebGL ? (
                 <>
                     <Globe
                         key="single-globe-instance"
                         ref={globeRef}
+                        width={dimensions.width}
+                        height={dimensions.height}
                         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
                         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"

@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
@@ -15,11 +17,11 @@ import { useAtom, useSetAtom } from "jotai";
 import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
 
 const ASTEROID_NAME = "Impactor-2025";
-
+const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
 
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
-
+    
     const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
 
     const setAsteroidParams = useSetAtom(asteroidParamsAtom);
@@ -50,6 +52,12 @@ export default function AsteroidImpactDashboard() {
 
     const [scenarioA, setScenarioA] = useState(null);
     const [scenarioB, setScenarioB] = useState(null);
+    
+    // We can keep these states for displaying the report in the UI if needed later, 
+    // but for the PDF download, we'll fetch the data inside exportPDF.
+    const [aiReport, setAiReport] = useState(null); 
+    const [isGenerating, setIsGenerating] = useState(false); 
+
 
     useEffect(() => {
         const url = "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
@@ -166,7 +174,6 @@ export default function AsteroidImpactDashboard() {
         globeRef.current.pointOfView({ lat: impact.lat, lng: impact.lng, altitude: 1.7 }, 1200);
     }, [impact]);
 
-    // Create explosion rings (visual effect only)
     const createExplosionRings = useCallback(() => {
         const EXPLOSION_STYLE = {
             ground: { colorShock: "#ff3b2f", colorThermal: "#ffa500", speed: 20 },
@@ -190,7 +197,7 @@ export default function AsteroidImpactDashboard() {
         };
         setExplosions((prev) => [...prev, newExpl]);
     }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
-
+    
     // Trigger asteroid animation (button click)
     const triggerExplosion = useCallback(() => {
         console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
@@ -322,6 +329,244 @@ const handleAngleChange = (newAngle) => {
     ]));
 
     const ringsData = [...impactRings, ...explosionRings];
+    // ---- Brand palette as RGB arrays (simpler than hex) ----
+    const C = {
+        BLUE_YONDER:  [46,150,245], // #2E96F5
+        NEON_BLUE:    [9,96,225],   // #0960E1
+        ELECTRIC_BLUE:[0,66,166],   // #0042A6
+        DEEP_BLUE:    [7,23,63],    // #07173F
+        ROCKET_RED:   [228,55,0],   // #E43700
+        MARTIAN_RED:  [142,17,0],   // #8E1100
+        NEON_YELLOW:  [234,254,7],  // #EAFE07
+        WHITE:        [255,255,255]
+    };
+    
+    // quick header band helper
+    function headerBand(doc, title, yTop = 0, bandH = 48) {
+        const W = doc.internal.pageSize.getWidth();
+        doc.setFillColor(...C.DEEP_BLUE);
+        doc.rect(0, yTop, W, bandH, "F");
+        doc.setFillColor(...C.NEON_YELLOW);
+        doc.rect(0, yTop + bandH, W, 4, "F");
+        doc.setTextColor(...C.WHITE);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text(title, 40, yTop + 32);
+    }
+
+    // -------------------------------------------------------------------
+    // NEW HELPER FUNCTION TO FETCH AI REPORT
+    // -------------------------------------------------------------------
+    const fetchAiReport = useCallback(async () => {
+        const postData = {
+            diameterM,
+            speedKms,
+            angleDeg,
+            kpisBase, // Calculated object
+            kpisMit,  // Calculated object
+            strategy,
+            impact,
+        };
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/generate-recommendations`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(postData),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data?.asteroidReport) {
+                return result.data.asteroidReport;
+            } else {
+                return "Error: AI recommendation data not found.";
+            }
+
+        } catch (error) {
+            console.error("Failed to fetch AI recommendations:", error);
+            return `Error: Could not connect to backend or API. Check console for details. (${error.message})`;
+        }
+    }, [diameterM, speedKms, angleDeg, kpisBase, kpisMit, strategy, impact]);
+    // -------------------------------------------------------------------
+
+    
+    async function exportPDF() {
+        // --- 1. START GENERATING REPORT (Optional: Display a loading toast/spinner here) ---
+        // For simplicity, we are not setting state here to avoid rerenders during PDF generation.
+        
+        let aiReportText = "AI Report Generation Failed.";
+        try {
+            aiReportText = await fetchAiReport();
+        } catch (e) {
+            console.error("Critical error during AI report fetch for PDF:", e);
+        }
+        
+        // --- 2. PROCEED WITH PDF GENERATION ---
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const W = doc.internal.pageSize.getWidth();
+        const H = doc.internal.pageSize.getHeight();
+        const pad = 40;
+    
+        // --- Cover header ---
+        doc.setFillColor(...C.DEEP_BLUE); doc.rect(0, 0, W, 84, "F");
+        doc.setFillColor(...C.NEON_YELLOW); doc.rect(0, 84, W, 6, "F");
+        doc.setTextColor(...C.WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(20);
+        doc.text("Asteroid Impact Report", pad, 50);
+        doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...C.BLUE_YONDER);
+        doc.text(new Date().toLocaleString(), pad, 68);
+    
+        // ---- Scenario summary table ----
+        autoTable(doc, {
+        startY: 110,
+        head: [["Parameter","Value"]],
+        body: [
+            ["Asteroid", "Impactor-2025"],
+            ["Latitude", impact.lat.toFixed(4)],
+            ["Longitude", impact.lng.toFixed(4)],
+            ["Diameter (m)", String(diameterM)],
+            ["Speed (km/s)", String(speedKms)],
+            ["Angle (deg)", String(angleDeg)],
+            ["Hex resolution", String(hexResolution)],
+            ["Strategy", strategy],
+            ...(strategy === "deflection" ? [
+            ["Δv (mm/s)", String(deltaVmm)],
+            ["Lead time (years)", String(leadYears)]
+            ] : []),
+            ...(strategy === "evacuation" ? [
+            ["Evac radius (km)", String(evacRadiusKm)],
+            ["Coverage (%)", String(evacCoverage)]
+            ] : []),
+        ],
+        theme: "grid",
+        styles: {
+            font: "helvetica",
+            fontSize: 10,
+            textColor: C.DEEP_BLUE,
+            lineColor: C.ELECTRIC_BLUE,
+            lineWidth: 0.5,
+            cellPadding: 5,
+        },
+        headStyles: {
+            fillColor: C.DEEP_BLUE,
+            textColor: C.WHITE,
+            lineColor: C.NEON_BLUE,
+            fontStyle: "bold",
+        },
+        margin: { left: pad, right: pad },
+        });
+    
+        // ---- KPI table (row accents) ----
+        autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 18,
+        head: [["Metric","Base","Mitigated"]],
+        body: [
+            ["Affected", kpisBase.pop.toLocaleString(), kpisMit.pop.toLocaleString()],
+            ["Deaths",   kpisBase.deaths.toLocaleString(), kpisMit.deaths.toLocaleString()],
+            ["Severe radius (km)", Math.round(kpisBase.severe), Math.round(kpisMit.severe)],
+            ["Major radius (km)",  Math.round(kpisBase.major),  Math.round(kpisMit.major)],
+            ["Light radius (km)",  Math.round(kpisBase.light),  Math.round(kpisMit.light)],
+        ],
+        theme: "grid",
+        styles: {
+            font: "helvetica",
+            fontSize: 10,
+            textColor: C.DEEP_BLUE,
+            lineColor: C.ELECTRIC_BLUE,
+            lineWidth: 0.5,
+            cellPadding: 5,
+        },
+        headStyles: {
+            fillColor: C.DEEP_BLUE,
+            textColor: C.WHITE,
+            lineColor: C.NEON_BLUE,
+            fontStyle: "bold",
+        },
+        didParseCell: (data) => {
+            if (data.section === "body" && data.row?.raw?.[0] === "Affected" && data.column.index === 0) {
+            data.cell.styles.fillColor = C.BLUE_YONDER;
+            data.cell.styles.textColor = C.WHITE;
+            }
+            if (data.section === "body" && data.row?.raw?.[0] === "Deaths" && data.column.index === 0) {
+            data.cell.styles.fillColor = C.ROCKET_RED;
+            data.cell.styles.textColor = C.WHITE;
+            }
+        },
+        margin: { left: pad, right: pad },
+        });
+
+    // ---- Add graph image below tables ----
+    const graphImg = new Image();
+    graphImg.src = "/image.png"; // your graph image in /public
+    await new Promise((resolve) => { graphImg.onload = resolve; });
+
+    // Keep aspect ratio
+    const aspect = graphImg.width / graphImg.height;
+    const imgW = 500;                     // fixed width (adjust as you like)
+    const imgH = imgW / aspect;           // auto height
+    let y = doc.lastAutoTable.finalY + 30; // place after the KPI table
+    const x = (W - imgW) / 2;             // center horizontally
+
+    // Check if image fits on the current page, if not, add a new page
+    if (y + imgH > H - 50) {
+        doc.addPage();
+        y = 50; // New page starting point
+    }
+    
+    doc.addImage(graphImg, "PNG", x, y, imgW, imgH);
+    y = y + imgH + 30; // Update Y for the next section
+
+    // -------------------------------------------------------------------
+    // PDF INTEGRATION FOR AI REPORT (Using the fetched aiReportText)
+    // -------------------------------------------------------------------
+    if (aiReportText) {
+        // Add a new page for the AI Report if content is getting too long
+        if (y > H - 100) {
+            doc.addPage();
+            y = 50;
+        }
+
+        headerBand(doc, "AI Mitigation Recommendations", y - 20, 48); // Custom header
+        y += 40; // Adjust after header band
+        
+        doc.setFontSize(10);
+        doc.setTextColor(...C.DEEP_BLUE);
+        doc.setFont("helvetica", "normal");
+        
+        const reportLines = doc.splitTextToSize(aiReportText, W - 2 * pad);
+        
+        let currentY = y;
+        
+        reportLines.forEach((line) => {
+            if (currentY > H - 50) { // Check for page overflow
+                doc.addPage();
+                currentY = 50;
+            }
+            doc.text(line, pad, currentY);
+            currentY += 14; // Line height
+        });
+
+    }
+    // -------------------------------------------------------------------
+        
+        // ---- Footer: page x / y in Neon Blue ----
+        const pages = doc.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+        doc.setPage(i);
+        doc.setTextColor(...C.NEON_BLUE);
+        doc.setFontSize(9);
+        doc.text(`Page ${i} / ${pages}`, W - pad, H - 12, { align: "right" });
+        }
+    
+        doc.save(`impact_report_${Date.now()}.pdf`);
+    }
+    
 
     return (
         <div className="h-screen w-screen bg-neutral-950 text-white overflow-hidden">
@@ -372,7 +617,7 @@ const handleAngleChange = (newAngle) => {
                 impact={impact}
             />
 
-            <Asteroid
+<Asteroid
                 globeRef={globeRef}
                 onImpactComplete={() => {
                     createExplosionRings(); // Changed from triggerExplosion
@@ -388,6 +633,7 @@ const handleAngleChange = (newAngle) => {
                     kpisMit={kpisMit}
                     compareData={compareData}
                     distanceCurve={distanceCurve}
+                    onExportPDF={exportPDF}                  
                 />
             </Panel>
         </div>
