@@ -23,6 +23,7 @@ export function GlobeView({
             {canWebGL ? (
                 <>
                     <Globe
+                        key="single-globe-instance"
                         ref={globeRef}
                         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
                         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
