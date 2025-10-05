@@ -11,7 +11,7 @@ export default function Asteroid({
 }) {
     const impact = useAtomValue(impactAtom);
     const { visible, isAnimating } = useAtomValue(asteroidAnimationAtom);
-    const { diameterM } = useAtomValue(asteroidParamsAtom);
+    const { diameterM, speedKms } = useAtomValue(asteroidParamsAtom);
     const setAnimationState = useSetAtom(asteroidAnimationAtom);
 
     const asteroidRef = useRef(null);
@@ -21,7 +21,7 @@ export default function Asteroid({
 
     const START_ALTITUDE = 3;
     const IMPACT_ALTITUDE = 0.01;
-    const DURATION_MS = 3000;
+    const DURATION_MS = 3000 - (speedKms - 19) * 50;
 
     // Load asteroid model ONCE
     useEffect(() => {

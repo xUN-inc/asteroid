@@ -246,6 +246,16 @@ export default function AsteroidImpactDashboard() {
     setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
 };
 
+const handleSpeedChange = (newSpeed) => {
+    setSpeedKms(newSpeed);
+    setAsteroidParams(prev => ({ ...prev, speedKms: newSpeed }));
+};
+
+const handleAngleChange = (newAngle) => {
+    setAngleDeg(newAngle);
+    setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
+};
+
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
     const snapshotScenario = (label) => ({
@@ -328,8 +338,8 @@ export default function AsteroidImpactDashboard() {
             <Panel isOpen={leftOpen} from="left" width={320}>
                 <LeftPanel
                     diameterM={diameterM} setDiameterM={handleDiameterChange}
-                    speedKms={speedKms} setSpeedKms={setSpeedKms}
-                    angleDeg={angleDeg} setAngleDeg={setAngleDeg}
+                    speedKms={speedKms} setSpeedKms={handleSpeedChange}
+                    angleDeg={angleDeg} setAngleDeg={handleAngleChange}
                     hexResolution={hexResolution} setHexResolution={setHexResolution}
                     kpisBase={kpisBase}
                     explosionType={explosionType} setExplosionType={setExplosionType}
