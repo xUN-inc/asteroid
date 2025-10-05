@@ -21,7 +21,13 @@ export default function Asteroid({
 
     const START_ALTITUDE = 3;
     const IMPACT_ALTITUDE = 0.01;
-    const DURATION_MS = 3000 - (speedKms - 19) * 50;
+    
+    // Calculate duration based on speed (11-72 km/s range)
+    // Faster asteroids = shorter animation
+    const DURATION_MS = 4000 - ((speedKms - 11) / (72 - 11)) * 2000; // 4000ms at 11km/s, 2000ms at 72km/s
+
+    // Calculate rotation speed based on speed
+    const ROTATION_SPEED = 0.02 + (speedKms / 72) * 0.08; // Faster rotation for faster asteroids
 
     // Load asteroid model ONCE
     useEffect(() => {
@@ -33,7 +39,7 @@ export default function Asteroid({
 
         // Recreate asteroid if it was removed
         if (!asteroidRef.current) {
-            console.log('🎨 Loading asteroid model, diameter:', diameterM);
+            console.log('🎨 Loading asteroid model, diameter:', diameterM, 'speed:', speedKms);
 
             const loader = new GLTFLoader();
             
@@ -94,9 +100,9 @@ export default function Asteroid({
                 }
             );
         }
-    }, [globeRef, impact.lat, impact.lng, diameterM]);
+    }, [globeRef, impact.lat, impact.lng, diameterM, speedKms]);
 
-    // Update scale when diameter changes (NEW - this is what was missing!)
+    // Update scale when diameter changes
     useEffect(() => {
         if (!asteroidRef.current) return;
 
@@ -137,26 +143,29 @@ export default function Asteroid({
             const coords = globeRef.current.getCoords(impact.lat, impact.lng, altitude);
             asteroidRef.current.position.set(coords.x, coords.y, coords.z);
 
-            // Rotate asteroid as it falls
-            asteroidRef.current.rotation.x += 0.05;
-            asteroidRef.current.rotation.y += 0.03;
+            // Rotate asteroid as it falls - more visible rotation
+            asteroidRef.current.rotation.x += ROTATION_SPEED;
+            asteroidRef.current.rotation.y += ROTATION_SPEED * 0.7;
+            asteroidRef.current.rotation.z += ROTATION_SPEED * 0.3;
         }
 
         if (progress < 1) {
             animationRef.current = requestAnimationFrame(animate);
         } else {
             console.log('💥 Impact reached!');
+            
+            // Remove immediately on impact
+            if (asteroidRef.current && sceneRef.current) {
+                sceneRef.current.remove(asteroidRef.current);
+                console.log('🗑️ Asteroid removed from scene');
+                asteroidRef.current = null;
+            }
+
+            // Trigger explosion callback
             if (onImpactComplete) onImpactComplete();
 
-            setTimeout(() => {
-                if (asteroidRef.current && sceneRef.current) {
-                    sceneRef.current.remove(asteroidRef.current);
-                    console.log('🗑️ Asteroid removed from scene');
-                    asteroidRef.current = null;
-                    
-                    setAnimationState({ visible: false, isAnimating: false });
-                }
-            }, 500);
+            // Update state
+            setAnimationState({ visible: false, isAnimating: false });
 
             startTimeRef.current = null;
         }
@@ -165,7 +174,7 @@ export default function Asteroid({
     // Start animation when isAnimating becomes true
     useEffect(() => {
         if (isAnimating && asteroidRef.current) {
-            console.log('🚀 Starting animation from altitude', START_ALTITUDE);
+            console.log('🚀 Starting animation from altitude', START_ALTITUDE, 'duration:', DURATION_MS, 'ms');
             startTimeRef.current = null;
             animationRef.current = requestAnimationFrame(animate);
         }
