@@ -23,29 +23,29 @@ export default function Asteroid({
 
     // Create cube and get scene reference
     useEffect(() => {
-    if (!globeRef.current) return;
+        if (!globeRef.current) return;
 
-    // Get scene reference once
-    if (!sceneRef.current) {
-        sceneRef.current = globeRef.current.scene();
-    }
-
-    // Create cube if it doesn't exist OR was removed
-    if (!asteroidRef.current) {
-        console.log('🎨 Creating asteroid cube at', impact);
-
-        const geometry = new THREE.BoxGeometry(20, 20, 20);
-        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-        const cube = new THREE.Mesh(geometry, material);
-
-        sceneRef.current.add(cube);
-        asteroidRef.current = cube;
-
-        if (onLoaded) {
-            onLoaded({ cube, impact });
+        // Get scene reference once
+        if (!sceneRef.current) {
+            sceneRef.current = globeRef.current.scene();
         }
-    }
-}, [globeRef, impact.lat, impact.lng]);
+
+        // Create cube if it doesn't exist OR was removed
+        if (!asteroidRef.current) {
+            console.log('🎨 Creating asteroid cube at', impact);
+
+            const geometry = new THREE.BoxGeometry(20, 20, 20);
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const cube = new THREE.Mesh(geometry, material);
+
+            sceneRef.current.add(cube);
+            asteroidRef.current = cube;
+
+            if (onLoaded) {
+                onLoaded({ cube, impact });
+            }
+        }
+    }, [globeRef, impact.lat, impact.lng]);
 
     // Position cube at new impact location (NOT just on mount)
     useEffect(() => {
@@ -78,6 +78,10 @@ export default function Asteroid({
         if (asteroidRef.current && globeRef.current) {
             const coords = globeRef.current.getCoords(impact.lat, impact.lng, altitude);
             asteroidRef.current.position.set(coords.x, coords.y, coords.z);
+
+            // Add rotation for visual effect
+            asteroidRef.current.rotation.x = progress * Math.PI * 4; // 4 full rotations
+            asteroidRef.current.rotation.y = progress * Math.PI * 3; // 3 full rotations
         }
 
         if (progress < 1) {
@@ -88,34 +92,34 @@ export default function Asteroid({
 
             // NEW: Remove asteroid after impact
             setTimeout(() => {
-        if (asteroidRef.current && sceneRef.current) {
-            sceneRef.current.remove(asteroidRef.current);
-            console.log('🗑️ Asteroid removed from scene');
-            asteroidRef.current = null;
-            
-            // Reset animation state
-            setAnimationState({ visible: false, isAnimating: false });
-        }
-    }, 500);
+                if (asteroidRef.current && sceneRef.current) {
+                    sceneRef.current.remove(asteroidRef.current);
+                    console.log('🗑️ Asteroid removed from scene');
+                    asteroidRef.current = null;
+
+                    // Reset animation state
+                    setAnimationState({ visible: false, isAnimating: false });
+                }
+            }, 500);
 
             startTimeRef.current = null;
         }
     };
 
     useEffect(() => {
-    if (visible && asteroidRef.current) {
-        console.log('🚀 Starting animation');
-        startTimeRef.current = null;
-        animationRef.current = requestAnimationFrame(animate);
-    }
-
-    return () => {
-        if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-            animationRef.current = null;
+        if (visible && asteroidRef.current) {
+            console.log('🚀 Starting animation');
+            startTimeRef.current = null;
+            animationRef.current = requestAnimationFrame(animate);
         }
-    };
-}, [visible]);
+
+        return () => {
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+                animationRef.current = null;
+            }
+        };
+    }, [visible]);
 
     // Show/hide cube
     useEffect(() => {
