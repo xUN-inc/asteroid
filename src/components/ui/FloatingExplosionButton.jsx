@@ -3,10 +3,6 @@ function FloatingExplosionButton({
   visible, 
   onTrigger, 
   selectedCountry 
-}: { 
-  visible: boolean; 
-  onTrigger: () => void; 
-  selectedCountry: string | null;
 }) {
   if (!visible) return null;
 
