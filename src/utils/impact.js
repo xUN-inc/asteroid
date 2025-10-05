@@ -85,9 +85,16 @@ export function impactModel({ diameterM, speedKms, angleDeg, explosionType }) {
     const W_TNT_angle = KE_angle / TNT_J;
     const W_pow_1_3 = Math.pow(W_TNT_angle, 1/3);
 
+    let surfaceFactor = 1.0;
+    if (explosionType === 'airburst') {
+        surfaceFactor = 0.7;
+    } else if (explosionType === 'water') {
+        surfaceFactor = 0.85;
+    }
+
     for (const zone of BLAST_ZONES) {
         const radius = zone.z * W_pow_1_3 / 1000; // km
-        blastRadii[`${zone.level}RadiusKm`] = radius;
+        blastRadii[`${zone.level}RadiusKm`] = radius * surfaceFactor;
     }
 
     // --- Fireball Calculation ---

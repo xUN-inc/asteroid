@@ -1,4 +1,3 @@
-
 import {
     Target, MapPin, ShieldHalf, GitCompare
 } from "lucide-react";
@@ -45,7 +44,7 @@ export function LeftPanel({
                 <div className="text-sm mt-2">
                     Computed explosion diameter:&nbsp;
                     <span className="font-mono">{explosionDiameterKm.toFixed(2)} km</span>
-                    <span className="opacity-70"> (auto from size/speed/angle/type)</span>
+                    <span className="opacity-70"> (severe blast radius)</span>
                 </div>
                 <button
                     onClick={triggerExplosion}
