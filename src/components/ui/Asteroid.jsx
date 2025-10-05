@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { impactAtom, asteroidAnimationAtom } from '../../utils/atom';
+import { impactAtom, asteroidAnimationAtom, asteroidParamsAtom } from '../../utils/atom';
 
 export default function Asteroid({
     globeRef,
@@ -9,7 +10,8 @@ export default function Asteroid({
     onLoaded
 }) {
     const impact = useAtomValue(impactAtom);
-    const { visible } = useAtomValue(asteroidAnimationAtom);
+    const { visible, isAnimating } = useAtomValue(asteroidAnimationAtom);
+    const { diameterM } = useAtomValue(asteroidParamsAtom);
     const setAnimationState = useSetAtom(asteroidAnimationAtom);
 
     const asteroidRef = useRef(null);
@@ -17,50 +19,98 @@ export default function Asteroid({
     const startTimeRef = useRef(null);
     const sceneRef = useRef(null);
 
-    const START_ALTITUDE = 2;
+    const START_ALTITUDE = 3; // Higher starting point
     const IMPACT_ALTITUDE = 0.01;
     const DURATION_MS = 3000;
 
-    // Create cube and get scene reference
+    // Load asteroid model ONCE
     useEffect(() => {
-        if (!globeRef.current) return;
+    if (!globeRef.current) return;
 
-        // Get scene reference once
-        if (!sceneRef.current) {
-            sceneRef.current = globeRef.current.scene();
-        }
+    if (!sceneRef.current) {
+        sceneRef.current = globeRef.current.scene();
+    }
 
-        // Create cube if it doesn't exist OR was removed
-        if (!asteroidRef.current) {
-            console.log('🎨 Creating asteroid cube at', impact);
+    // Recreate asteroid if it was removed
+    if (!asteroidRef.current) {
+        console.log('🎨 Loading asteroid model, diameter:', diameterM);
 
-            const geometry = new THREE.BoxGeometry(20, 20, 20);
-            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            const cube = new THREE.Mesh(geometry, material);
+        const loader = new GLTFLoader();
+        
+        loader.load(
+            '/models/Bennu.glb',
+            (gltf) => {
+                console.log('✅ Asteroid model loaded successfully');
+                const asteroid = gltf.scene;
+                
+                // Scale: Bennu is ~500m in real life
+                const baseScale = diameterM / 500;
+                const visualScale = baseScale * 20;
+                
+                console.log('📏 Asteroid scale:', visualScale, 'for diameter:', diameterM);
+                asteroid.scale.set(visualScale, visualScale, visualScale);
+                
+                // Initial rotation
+                asteroid.rotation.set(0.5, 0.8, 0.3);
+                
+                sceneRef.current.add(asteroid);
+                asteroidRef.current = asteroid;
 
-            sceneRef.current.add(cube);
-            asteroidRef.current = cube;
+                // Position it immediately at impact location
+                const coords = globeRef.current.getCoords(
+                    impact.lat,
+                    impact.lng,
+                    START_ALTITUDE
+                );
+                asteroid.position.set(coords.x, coords.y, coords.z);
+                console.log('📍 Initial position:', coords);
 
-            if (onLoaded) {
-                onLoaded({ cube, impact });
+                if (onLoaded) {
+                    onLoaded({ asteroid, impact });
+                }
+            },
+            (progress) => {
+                if (progress.total > 0) {
+                    const percent = (progress.loaded / progress.total * 100).toFixed(0);
+                    console.log(`Loading asteroid: ${percent}%`);
+                }
+            },
+            (error) => {
+                console.error('❌ Failed to load asteroid model:', error);
+                
+                // Fallback to visible cube
+                const cubeSize = 50;
+                const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: 0xff0000,
+                    wireframe: false 
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                
+                sceneRef.current.add(cube);
+                asteroidRef.current = cube;
+                
+                console.log('⚠️ Using fallback cube');
             }
-        }
-    }, [globeRef, impact.lat, impact.lng]);
-
-    // Position cube at new impact location (NOT just on mount)
-    useEffect(() => {
-        if (!asteroidRef.current || !globeRef.current) return;
-
-        console.log('📍 Updating asteroid position to:', impact);
-
-        // Position at start location
-        const coords = globeRef.current.getCoords(
-            impact.lat,
-            impact.lng,
-            START_ALTITUDE
         );
-        asteroidRef.current.position.set(coords.x, coords.y, coords.z);
-    }, [impact.lat, impact.lng]); // ← This runs when impact changes!
+    }
+}, [globeRef, impact.lat, impact.lng, diameterM]); // Only run once when globe is ready
+
+    // Reposition when impact changes
+    useEffect(() => {
+    // Skip if asteroid is still loading or not available
+    if (!asteroidRef.current || !globeRef.current) return;
+
+    console.log('📍 Repositioning asteroid to:', impact);
+
+    const coords = globeRef.current.getCoords(
+        impact.lat,
+        impact.lng,
+        START_ALTITUDE
+    );
+    asteroidRef.current.position.set(coords.x, coords.y, coords.z);
+    asteroidRef.current.visible = true;
+}, [impact.lat, impact.lng]);
 
     // Animation function
     const animate = (currentTime) => {
@@ -71,17 +121,15 @@ export default function Asteroid({
         const elapsed = currentTime - startTimeRef.current;
         const progress = Math.min(elapsed / DURATION_MS, 1);
 
-        // Calculate current altitude
         const altitude = START_ALTITUDE - (START_ALTITUDE - IMPACT_ALTITUDE) * progress;
 
-        // Update cube position
         if (asteroidRef.current && globeRef.current) {
             const coords = globeRef.current.getCoords(impact.lat, impact.lng, altitude);
             asteroidRef.current.position.set(coords.x, coords.y, coords.z);
 
-            // Add rotation for visual effect
-            asteroidRef.current.rotation.x = progress * Math.PI * 4; // 4 full rotations
-            asteroidRef.current.rotation.y = progress * Math.PI * 3; // 3 full rotations
+            // Rotate asteroid as it falls
+            asteroidRef.current.rotation.x += 0.05;
+            asteroidRef.current.rotation.y += 0.03;
         }
 
         if (progress < 1) {
@@ -90,14 +138,12 @@ export default function Asteroid({
             console.log('💥 Impact reached!');
             if (onImpactComplete) onImpactComplete();
 
-            // NEW: Remove asteroid after impact
             setTimeout(() => {
                 if (asteroidRef.current && sceneRef.current) {
                     sceneRef.current.remove(asteroidRef.current);
                     console.log('🗑️ Asteroid removed from scene');
                     asteroidRef.current = null;
-
-                    // Reset animation state
+                    
                     setAnimationState({ visible: false, isAnimating: false });
                 }
             }, 500);
@@ -106,9 +152,10 @@ export default function Asteroid({
         }
     };
 
+    // Start animation when isAnimating becomes true
     useEffect(() => {
-        if (visible && asteroidRef.current) {
-            console.log('🚀 Starting animation');
+        if (isAnimating && asteroidRef.current) {
+            console.log('🚀 Starting animation from altitude', START_ALTITUDE);
             startTimeRef.current = null;
             animationRef.current = requestAnimationFrame(animate);
         }
@@ -119,14 +166,7 @@ export default function Asteroid({
                 animationRef.current = null;
             }
         };
-    }, [visible]);
-
-    // Show/hide cube
-    useEffect(() => {
-        if (asteroidRef.current) {
-            asteroidRef.current.visible = visible !== false;
-        }
-    }, [visible]);
+    }, [isAnimating]); // Changed from 'visible' to 'isAnimating'
 
     return null;
 }

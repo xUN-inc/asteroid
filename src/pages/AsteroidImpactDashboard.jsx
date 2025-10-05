@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
@@ -49,10 +48,6 @@ export default function AsteroidImpactDashboard() {
 
     const [scenarioA, setScenarioA] = useState(null);
     const [scenarioB, setScenarioB] = useState(null);
-
-
-
-
 
     useEffect(() => {
         const url = "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
@@ -169,7 +164,8 @@ export default function AsteroidImpactDashboard() {
         globeRef.current.pointOfView({ lat: impact.lat, lng: impact.lng, altitude: 1.7 }, 1200);
     }, [impact]);
 
-    const triggerExplosion = useCallback(() => {
+    // Create explosion rings (visual effect only)
+    const createExplosionRings = useCallback(() => {
         const EXPLOSION_STYLE = {
             ground: { colorShock: "#ff3b2f", colorThermal: "#ffa500", speed: 20 },
             airburst: { colorShock: "#fff176", colorThermal: "#ffffff", speed: 30 },
@@ -193,6 +189,16 @@ export default function AsteroidImpactDashboard() {
         setExplosions((prev) => [...prev, newExpl]);
     }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
 
+    // Trigger asteroid animation (button click)
+    const triggerExplosion = useCallback(() => {
+        console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
+        
+        // Start asteroid animation
+        setAnimationState({ visible: true, isAnimating: true });
+        
+        // Explosion rings will be created when asteroid hits (via onImpactComplete)
+    }, [setAnimationState]);
+
     useEffect(() => {
         if (explosions.length === 0) return;
         const t = setInterval(() => {
@@ -203,35 +209,35 @@ export default function AsteroidImpactDashboard() {
     }, [explosions.length]);
 
     const onStartSimulation = () => {
-    const preset = ASTEROID_PRESETS[ASTEROID_NAME];
-    if (preset) {
-        setDiameterM(preset.diameterM);
-        setSpeedKms(preset.speedKms);
-        setAngleDeg(preset.angleDeg);
-    }
-    setRightOpen(true);
-    
-    // Start asteroid animation
-    setAnimationState({ visible: true, isAnimating: true });
-};
+        const preset = ASTEROID_PRESETS[ASTEROID_NAME];
+        if (preset) {
+            setDiameterM(preset.diameterM);
+            setSpeedKms(preset.speedKms);
+            setAngleDeg(preset.angleDeg);
+        }
+        setRightOpen(true);
+
+        // Start asteroid animation
+        setAnimationState({ visible: true, isAnimating: true });
+    };
 
     const handleGlobeClick = (pos) => {
-    const { lat, lng } = pos;
-    setSelectedCountry(null);
-    setImpact({ lat, lng });
-    
-    // Reset asteroid visibility when clicking new location
-    setAnimationState({ visible: true, isAnimating: false });
-};
+        const { lat, lng } = pos;
+        setSelectedCountry(null);
+        setImpact({ lat, lng });
+
+        // Reset asteroid visibility when clicking new location
+        setAnimationState({ visible: true, isAnimating: false });
+    };
 
     const handleCountryClick = (feat) => {
-    const centroid = featureCentroid(feat);
-    setSelectedCountry(feat.properties?.name || null);
-    setImpact(centroid);
-    
-    // Reset asteroid visibility when clicking new country
-    setAnimationState({ visible: true, isAnimating: false });
-};
+        const centroid = featureCentroid(feat);
+        setSelectedCountry(feat.properties?.name || null);
+        setImpact(centroid);
+
+        // Reset asteroid visibility when clicking new country
+        setAnimationState({ visible: true, isAnimating: false });
+    };
 
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
@@ -335,30 +341,29 @@ export default function AsteroidImpactDashboard() {
             </Panel>
 
             <GlobeView
-    globeRef={globeRef}
-    countries={countries}
-    selectedCountry={selectedCountry}
-    onPolygonClick={handleCountryClick}
-    onGlobeClick={handleGlobeClick}
-    points={points}
-    hexResolution={hexResolution}
-    maxWeight={maxWeight}
-    colorScale={colorScale}
-    ringsData={ringsData}
-    cityLabels={cityLabels}
-    impact={impact}
-/>
+                globeRef={globeRef}
+                countries={countries}
+                selectedCountry={selectedCountry}
+                onPolygonClick={handleCountryClick}
+                onGlobeClick={handleGlobeClick}
+                points={points}
+                hexResolution={hexResolution}
+                maxWeight={maxWeight}
+                colorScale={colorScale}
+                ringsData={ringsData}
+                cityLabels={cityLabels}
+                impact={impact}
+            />
 
             <Asteroid
-    globeRef={globeRef}
-    onImpactComplete={() => {
-        triggerExplosion();
-    }}
-    onLoaded={(asteroid) => {
-        console.log('Asteroid ready!', asteroid);
-    }}
-/>
-
+                globeRef={globeRef}
+                onImpactComplete={() => {
+                    createExplosionRings(); // Changed from triggerExplosion
+                }}
+                onLoaded={(asteroid) => {
+                    console.log('Asteroid ready!', asteroid);
+                }}
+            />
 
             <Panel isOpen={rightOpen} from="right" width={420}>
                 <RightPanel
@@ -368,14 +373,6 @@ export default function AsteroidImpactDashboard() {
                     distanceCurve={distanceCurve}
                 />
             </Panel>
-
-            {/* <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
-                <div className="mx-auto max-w-7xl px-4 pb-3 flex gap-2">
-                    <div className="pointer-events-auto rounded-2xl bg-neutral-900/60 border border-white/10 px-3 py-2 text-xs">
-                        Frontend demo • Click globe or country • Integrate NASA/USGS & WorldPop next
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 }
