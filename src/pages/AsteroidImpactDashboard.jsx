@@ -44,7 +44,7 @@ function LoadingFallback({ message }) {
 }
 
 const ASTEROID_NAME = "Impactor-2025";
-const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
+const BACKEND_URL = "https://like-reflect-segments-intellectual.trycloudflare.com"; // <--- Ensure this is correct
 
 
 function FloatingExplosionButton({ visible,
