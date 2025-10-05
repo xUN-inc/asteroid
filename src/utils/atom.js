@@ -8,3 +8,9 @@ export const asteroidParamsAtom = atom({
     angleDeg: 45
 })
 
+
+// To this:
+export const asteroidAnimationAtom = atom({
+    visible: true,  // ← Start as visible so we can see it
+    isAnimating: false
+})

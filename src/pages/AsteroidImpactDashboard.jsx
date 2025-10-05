@@ -12,6 +12,8 @@ import {
 } from "../utils/impact";
 import { ASTEROID_PRESETS } from "../utils/presets";
 import Asteroid from "../components/ui/Asteroid"
+import { useAtom, useSetAtom } from "jotai";
+import { asteroidAnimationAtom, impactAtom } from "../utils/atom";
 
 const ASTEROID_NAME = "Impactor-2025";
 
@@ -19,7 +21,7 @@ const ASTEROID_NAME = "Impactor-2025";
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
 
-    const [showAsteroid, setShowAsteroid] = useState(true);
+    const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
 
     const [leftOpen, setLeftOpen] = useState(true);
     const [rightOpen, setRightOpen] = useState(false);
@@ -28,7 +30,8 @@ export default function AsteroidImpactDashboard() {
     const [selectedCountry, setSelectedCountry] = useState(null);
     const [showLabels, setShowLabels] = useState(false);
 
-    const [impact, setImpact] = useState({ lat: 40.0, lng: 29.0 });
+    const [impact, setImpact] = useAtom(impactAtom);
+
     const [diameterM, setDiameterM] = useState(200);
     const [speedKms, setSpeedKms] = useState(19);
     const [angleDeg, setAngleDeg] = useState(45);
@@ -200,30 +203,35 @@ export default function AsteroidImpactDashboard() {
     }, [explosions.length]);
 
     const onStartSimulation = () => {
-        const preset = ASTEROID_PRESETS[ASTEROID_NAME];
-        if (preset) {
-            setDiameterM(preset.diameterM);
-            setSpeedKms(preset.speedKms);
-            setAngleDeg(preset.angleDeg);
-        }
-        setRightOpen(true);
-        triggerExplosion();
-    };
+    const preset = ASTEROID_PRESETS[ASTEROID_NAME];
+    if (preset) {
+        setDiameterM(preset.diameterM);
+        setSpeedKms(preset.speedKms);
+        setAngleDeg(preset.angleDeg);
+    }
+    setRightOpen(true);
+    
+    // Start asteroid animation
+    setAnimationState({ visible: true, isAnimating: true });
+};
 
     const handleGlobeClick = (pos) => {
-        const { lat, lng } = pos;
-        setSelectedCountry(null);
-        setImpact({ lat, lng });
-
-        // Show asteroid and trigger animation
-        setShowAsteroid(true);
-    };
+    const { lat, lng } = pos;
+    setSelectedCountry(null);
+    setImpact({ lat, lng });
+    
+    // Reset asteroid visibility when clicking new location
+    setAnimationState({ visible: true, isAnimating: false });
+};
 
     const handleCountryClick = (feat) => {
-        const centroid = featureCentroid(feat);
-        setSelectedCountry(feat.properties?.name || null);
-        setImpact(centroid);
-    };
+    const centroid = featureCentroid(feat);
+    setSelectedCountry(feat.properties?.name || null);
+    setImpact(centroid);
+    
+    // Reset asteroid visibility when clicking new country
+    setAnimationState({ visible: true, isAnimating: false });
+};
 
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
@@ -342,20 +350,14 @@ export default function AsteroidImpactDashboard() {
 />
 
             <Asteroid
-                globeRef={globeRef}
-                diameterM={diameterM}
-                visible={showAsteroid}
-                impact={impact}  // Pass impact location
-                onImpactComplete={() => {
-                    // Trigger explosion when asteroid arrives
-                    triggerExplosion();
-                    // Optionally hide asteroid after impact
-                    // setTimeout(() => setShowAsteroid(false), 1000);
-                }}
-                onLoaded={(asteroid) => {
-                    console.log('Asteroid ready for animation!', asteroid);
-                }}
-            />
+    globeRef={globeRef}
+    onImpactComplete={() => {
+        triggerExplosion();
+    }}
+    onLoaded={(asteroid) => {
+        console.log('Asteroid ready!', asteroid);
+    }}
+/>
 
 
             <Panel isOpen={rightOpen} from="right" width={420}>

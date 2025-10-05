@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { impactAtom, asteroidAnimationAtom } from '../../utils/atom';
 
 export default function Asteroid({
     globeRef,
-    impact,
-    onLoaded,
-    visible,
-    onImpactComplete
+    onImpactComplete,
+    onLoaded
 }) {
+    const impact = useAtomValue(impactAtom);
+    const { visible } = useAtomValue(asteroidAnimationAtom);
+    const setAnimationState = useSetAtom(asteroidAnimationAtom);
+
     const asteroidRef = useRef(null);
     const animationRef = useRef(null);
     const startTimeRef = useRef(null);
@@ -19,31 +23,29 @@ export default function Asteroid({
 
     // Create cube and get scene reference
     useEffect(() => {
-        if (!globeRef.current) return;
+    if (!globeRef.current) return;
 
-        // Get scene reference once
-        if (!sceneRef.current) {
-            sceneRef.current = globeRef.current.scene();
+    // Get scene reference once
+    if (!sceneRef.current) {
+        sceneRef.current = globeRef.current.scene();
+    }
+
+    // Create cube if it doesn't exist OR was removed
+    if (!asteroidRef.current) {
+        console.log('🎨 Creating asteroid cube at', impact);
+
+        const geometry = new THREE.BoxGeometry(20, 20, 20);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const cube = new THREE.Mesh(geometry, material);
+
+        sceneRef.current.add(cube);
+        asteroidRef.current = cube;
+
+        if (onLoaded) {
+            onLoaded({ cube, impact });
         }
-
-        // Create cube if it doesn't exist OR was removed
-        if (!asteroidRef.current) {
-            console.log('🎨 Creating asteroid cube');
-
-            const geometry = new THREE.BoxGeometry(20, 20, 20);
-            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            const cube = new THREE.Mesh(geometry, material);
-
-            sceneRef.current.add(cube);
-            asteroidRef.current = cube;
-
-            if (onLoaded) {
-                onLoaded({ cube, impact });
-            }
-
-            // NO cleanup here - we'll handle it manually in animate
-        }
-    }, [globeRef]);
+    }
+}, [globeRef, impact.lat, impact.lng]);
 
     // Position cube at new impact location (NOT just on mount)
     useEffect(() => {
@@ -86,32 +88,34 @@ export default function Asteroid({
 
             // NEW: Remove asteroid after impact
             setTimeout(() => {
-                if (asteroidRef.current && sceneRef.current) {
-                    sceneRef.current.remove(asteroidRef.current);
-                    console.log('🗑️ Asteroid removed from scene');
-                    asteroidRef.current = null; // Clear reference
-                }
-            }, 500);
+        if (asteroidRef.current && sceneRef.current) {
+            sceneRef.current.remove(asteroidRef.current);
+            console.log('🗑️ Asteroid removed from scene');
+            asteroidRef.current = null;
+            
+            // Reset animation state
+            setAnimationState({ visible: false, isAnimating: false });
+        }
+    }, 500);
 
             startTimeRef.current = null;
         }
     };
 
-    // Start/stop animation
     useEffect(() => {
-        if (visible && asteroidRef.current) {
-            console.log('🚀 Starting animation');
-            startTimeRef.current = null;
-            animationRef.current = requestAnimationFrame(animate);
-        }
+    if (visible && asteroidRef.current) {
+        console.log('🚀 Starting animation');
+        startTimeRef.current = null;
+        animationRef.current = requestAnimationFrame(animate);
+    }
 
-        return () => {
-            if (animationRef.current) {
-                cancelAnimationFrame(animationRef.current);
-                animationRef.current = null;
-            }
-        };
-    }, [visible, impact.lat, impact.lng]); // ← Also restart when impact changes
+    return () => {
+        if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+        }
+    };
+}, [visible]);
 
     // Show/hide cube
     useEffect(() => {
