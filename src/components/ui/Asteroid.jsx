@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-export default function Asteroid({ 
+export default function Asteroid({
     globeRef,
     impact,
     onLoaded,
@@ -26,30 +26,22 @@ export default function Asteroid({
             sceneRef.current = globeRef.current.scene();
         }
 
-        // Create cube if it doesn't exist
+        // Create cube if it doesn't exist OR was removed
         if (!asteroidRef.current) {
             console.log('🎨 Creating asteroid cube');
-            
+
             const geometry = new THREE.BoxGeometry(20, 20, 20);
             const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
             const cube = new THREE.Mesh(geometry, material);
-            
+
             sceneRef.current.add(cube);
             asteroidRef.current = cube;
-            
+
             if (onLoaded) {
                 onLoaded({ cube, impact });
             }
 
-            return () => {
-                console.log('🧹 Removing asteroid cube');
-                if (asteroidRef.current) {
-                    sceneRef.current.remove(asteroidRef.current);
-                    geometry.dispose();
-                    material.dispose();
-                    asteroidRef.current = null;
-                }
-            };
+            // NO cleanup here - we'll handle it manually in animate
         }
     }, [globeRef]);
 
@@ -58,57 +50,52 @@ export default function Asteroid({
         if (!asteroidRef.current || !globeRef.current) return;
 
         console.log('📍 Updating asteroid position to:', impact);
-        
+
         // Position at start location
         const coords = globeRef.current.getCoords(
-            impact.lat, 
-            impact.lng, 
+            impact.lat,
+            impact.lng,
             START_ALTITUDE
         );
         asteroidRef.current.position.set(coords.x, coords.y, coords.z);
     }, [impact.lat, impact.lng]); // ← This runs when impact changes!
 
     // Animation function
-   const animate = (currentTime) => {
-    if (!startTimeRef.current) {
-        startTimeRef.current = currentTime;
-    }
+    const animate = (currentTime) => {
+        if (!startTimeRef.current) {
+            startTimeRef.current = currentTime;
+        }
 
-    const elapsed = currentTime - startTimeRef.current;
-    const progress = Math.min(elapsed / DURATION_MS, 1);
+        const elapsed = currentTime - startTimeRef.current;
+        const progress = Math.min(elapsed / DURATION_MS, 1);
 
-    // Calculate current altitude
-    const altitude = START_ALTITUDE - (START_ALTITUDE - IMPACT_ALTITUDE) * progress;
-    
-    // Update cube position
-    if (asteroidRef.current && globeRef.current) {
-        const coords = globeRef.current.getCoords(impact.lat, impact.lng, altitude);
-        asteroidRef.current.position.set(coords.x, coords.y, coords.z);
-    }
+        // Calculate current altitude
+        const altitude = START_ALTITUDE - (START_ALTITUDE - IMPACT_ALTITUDE) * progress;
 
-    if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-    } else {
-        console.log('💥 Impact reached!');
-        if (onImpactComplete) onImpactComplete();
-        
-        // NEW: Remove asteroid after impact
-        setTimeout(() => {
-            if (asteroidRef.current && sceneRef.current) {
-                sceneRef.current.remove(asteroidRef.current);
-                console.log('🗑️ Asteroid removed from scene');
-                asteroidRef.current = null; // Clear reference
-                
-                // Notify parent that asteroid is gone
-                if (onLoaded) {
-                    onLoaded({ cube: null, impact });
+        // Update cube position
+        if (asteroidRef.current && globeRef.current) {
+            const coords = globeRef.current.getCoords(impact.lat, impact.lng, altitude);
+            asteroidRef.current.position.set(coords.x, coords.y, coords.z);
+        }
+
+        if (progress < 1) {
+            animationRef.current = requestAnimationFrame(animate);
+        } else {
+            console.log('💥 Impact reached!');
+            if (onImpactComplete) onImpactComplete();
+
+            // NEW: Remove asteroid after impact
+            setTimeout(() => {
+                if (asteroidRef.current && sceneRef.current) {
+                    sceneRef.current.remove(asteroidRef.current);
+                    console.log('🗑️ Asteroid removed from scene');
+                    asteroidRef.current = null; // Clear reference
                 }
-            }
-        }, 500);
-        
-        startTimeRef.current = null;
-    }
-};
+            }, 500);
+
+            startTimeRef.current = null;
+        }
+    };
 
     // Start/stop animation
     useEffect(() => {
