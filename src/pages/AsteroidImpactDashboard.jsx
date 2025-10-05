@@ -3,7 +3,7 @@ import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
 // import { RightPanel } from "../components/dashboard/RightPanel";
-import { GlobeView } from "../components/dashboard/GlobeView";
+// import { GlobeView } from "../components/dashboard/GlobeView";
 import { featureCentroid, colorScale } from "../utils/geo";
 import {
     impactModel, randomPointsAround, estimatePopulation,
@@ -15,6 +15,10 @@ import { useAtom, useSetAtom } from "jotai";
 import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
 
 const Asteroid = lazy(() => import("../components/ui/Asteroid"));
+const GlobeView = lazy(() => import("../components/dashboard/GlobeView").then(({ GlobeView }) => ({
+    default: GlobeView
+})));
+
 const RightPanel = lazy(() =>
     import("../components/dashboard/RightPanel").then(({ RightPanel }) => ({
         default: RightPanel
@@ -278,7 +282,7 @@ export default function AsteroidImpactDashboard() {
         setAsteroidParams(prev => ({ ...prev, angleDeg: newAngle }));
     }, [setAsteroidParams]);
 
-    
+
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
     const snapshotScenario = (label) => ({
@@ -379,22 +383,24 @@ export default function AsteroidImpactDashboard() {
                     delta={delta}
                 />
             </Panel>
+            <Suspense fallback={<LoadingFallback message="Loading globe..." />}>
+                <GlobeView
+                    globeRef={globeRef}
+                    countries={countries}
+                    selectedCountry={selectedCountry}
+                    onPolygonClick={handleCountryClick}
+                    onGlobeClick={handleGlobeClick}
+                    points={points}
+                    hexResolution={hexResolution}
+                    maxWeight={maxWeight}
+                    colorScale={colorScale}
+                    ringsData={ringsData}
+                    cityLabels={cityLabels}
+                    impact={impact}
+                />
+            </Suspense>
 
-            <GlobeView
-                globeRef={globeRef}
-                countries={countries}
-                selectedCountry={selectedCountry}
-                onPolygonClick={handleCountryClick}
-                onGlobeClick={handleGlobeClick}
-                points={points}
-                hexResolution={hexResolution}
-                maxWeight={maxWeight}
-                colorScale={colorScale}
-                ringsData={ringsData}
-                cityLabels={cityLabels}
-                impact={impact}
-            />
-
+            
             {animationState.visible && (
                 <Suspense fallback={<LoadingFallback message="Loading asteroid…" />}>
                     <Asteroid
