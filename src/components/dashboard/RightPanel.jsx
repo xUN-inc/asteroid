@@ -4,6 +4,7 @@ import { Stat } from "../../shared/Stat";
 import { RiskLineChart } from "../../shared/RiskLineChart";
 import DeckMiniMap from "../../shared/DeckMinimap";
 import NearEarthFetch from "../../shared/NearEarthFetch";
+import { CasualtyPieChart } from "../../shared/casualtyPieChart";
 
 const MS_DAY = 86_400_000;
 
@@ -102,9 +103,10 @@ export const RightPanel = forwardRef(function RightPanel(
 
       {/* Risk line chart */}
       <RiskLineChart data={distanceCurve} />
+      <CasualtyPieChart deaths={kpisMit.deaths} total={kpisMit.pop} />
 
-{/* Approaches filter */}
-<section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
+      {/* Approaches filter */}
+      <section className="rounded-2xl bg-neutral-800/60 border border-white/10 p-3">
         <div className="text-sm font-semibold mb-2">Approaches filter</div>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-[11px] opacity-80">
