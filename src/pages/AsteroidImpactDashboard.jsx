@@ -64,8 +64,8 @@ export default function AsteroidImpactDashboard() {
     );
 
     const explosionDiameterKm = useMemo(() => {
-        return baseR.severeRadiusKm;
-    }, [baseR.severeRadiusKm]);
+        return baseR.fireballRadiusKm * 2;
+    }, [baseR.fireballRadiusKm]);
 
     const mitigatedR = useMemo(() => {
         if (strategy !== "deflection") return baseR;

@@ -98,8 +98,23 @@ export function impactModel({ diameterM, speedKms, angleDeg, explosionType }) {
     }
 
     // --- Fireball Calculation ---
-    const fireballRadiusKm = 0.00014 * Math.pow(KE, 1/3);
-    const fireballDurationS = 0.002 * Math.pow(KE, 1/3);
+    // --- Fireball Calculation ---
+    let fireballRadiusKm = 0.00014 * Math.pow(KE, 1/3) /1000;
+    let fireballDurationS = 0.002 * Math.pow(KE, 1/3);
+
+    // Modify based on explosion type
+    if (explosionType === 'airburst') {
+        // Fireball dissipates quickly in the atmosphere
+        fireballRadiusKm *= 0.7;
+        fireballDurationS *= 0.5;
+    } else if (explosionType === 'water') {
+        // Much energy goes into vaporizing water instead of glowing plasma
+        fireballRadiusKm *= 0.3;
+        fireballDurationS *= 0.8;
+    } else if (explosionType === 'ground') {
+        // Ground impacts maximize visible fireball (baseline = 1.0)
+        fireballRadiusKm *= 1.0;
+    }
 
     return {
         craterDiameterKm,

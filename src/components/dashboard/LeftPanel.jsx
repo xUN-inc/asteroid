@@ -44,7 +44,7 @@ export function LeftPanel({
                 <div className="text-sm mt-2">
                     Computed explosion diameter:&nbsp;
                     <span className="font-mono">{explosionDiameterKm.toFixed(2)} km</span>
-                    <span className="opacity-70"> (severe blast radius)</span>
+                    <span className="opacity-70"> (fireball diameter)</span>
                 </div>
                 <button
                     onClick={triggerExplosion}
@@ -53,7 +53,7 @@ export function LeftPanel({
                     Trigger Explosion
                 </button>
                 <p className="text-[11px] opacity-70">
-                    Fireball size is estimated from impact energy.
+                    Explosion size is estimated from impact energy.
                 </p>
             </section>
 
