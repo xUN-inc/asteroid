@@ -99,14 +99,14 @@ export default function AsteroidImpactDashboard() {
 
     const isMobile = useIsMobile();
 
-    // Initialize based on a condition that checks window size directly
-    const [leftOpen, setLeftOpen] = useState(() => {
-        // Only open on initial load if not mobile
-        return typeof window !== 'undefined' && window.innerWidth >= 640;
-    });
+// Initialize based on a condition that checks window size directly
+const [leftOpen, setLeftOpen] = useState(() => {
+    // Only open on initial load if not mobile
+    return typeof window !== 'undefined' && window.innerWidth >= 640;
+});
     const [rightOpen, setRightOpen] = useState(false);
 
-
+    
 
     const [countries, setCountries] = useState([]);
     const [selectedCountry, setSelectedCountry] = useState(null);
