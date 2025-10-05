@@ -1,10 +1,5 @@
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-<<<<<<< HEAD
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-=======
->>>>>>> c38dc94 (Merge from origin)
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
