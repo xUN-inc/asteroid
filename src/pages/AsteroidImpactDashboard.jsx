@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Panel } from "../components/ui/Panel";
 import { TopBar } from "../components/dashboard/TopBar";
 import { LeftPanel } from "../components/dashboard/LeftPanel";
@@ -19,7 +21,7 @@ const BACKEND_URL = "http://localhost:3001"; // <--- Ensure this is correct
 
 export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
-
+    
     const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
 
     const setAsteroidParams = useSetAtom(asteroidParamsAtom);
@@ -172,7 +174,6 @@ export default function AsteroidImpactDashboard() {
         globeRef.current.pointOfView({ lat: impact.lat, lng: impact.lng, altitude: 1.7 }, 1200);
     }, [impact]);
 
-    // Create explosion rings (visual effect only)
     const createExplosionRings = useCallback(() => {
         const EXPLOSION_STYLE = {
             ground: { colorShock: "#ff3b2f", colorThermal: "#ffa500", speed: 20 },
@@ -196,7 +197,7 @@ export default function AsteroidImpactDashboard() {
         };
         setExplosions((prev) => [...prev, newExpl]);
     }, [explosionDiameterKm, explosionType, impact.lat, impact.lng]);
-
+    
     // Trigger asteroid animation (button click)
     const triggerExplosion = useCallback(() => {
         console.log('🔴 Trigger Explosion clicked - starting asteroid animation!');
@@ -616,7 +617,7 @@ const handleAngleChange = (newAngle) => {
                 impact={impact}
             />
 
-            <Asteroid
+<Asteroid
                 globeRef={globeRef}
                 onImpactComplete={() => {
                     createExplosionRings(); // Changed from triggerExplosion
