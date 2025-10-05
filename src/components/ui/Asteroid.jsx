@@ -19,98 +19,108 @@ export default function Asteroid({
     const startTimeRef = useRef(null);
     const sceneRef = useRef(null);
 
-    const START_ALTITUDE = 3; // Higher starting point
+    const START_ALTITUDE = 3;
     const IMPACT_ALTITUDE = 0.01;
     const DURATION_MS = 3000;
 
     // Load asteroid model ONCE
     useEffect(() => {
-    if (!globeRef.current) return;
+        if (!globeRef.current) return;
 
-    if (!sceneRef.current) {
-        sceneRef.current = globeRef.current.scene();
-    }
+        if (!sceneRef.current) {
+            sceneRef.current = globeRef.current.scene();
+        }
 
-    // Recreate asteroid if it was removed
-    if (!asteroidRef.current) {
-        console.log('🎨 Loading asteroid model, diameter:', diameterM);
+        // Recreate asteroid if it was removed
+        if (!asteroidRef.current) {
+            console.log('🎨 Loading asteroid model, diameter:', diameterM);
 
-        const loader = new GLTFLoader();
+            const loader = new GLTFLoader();
+            
+            loader.load(
+                '/models/Bennu.glb',
+                (gltf) => {
+                    console.log('✅ Asteroid model loaded successfully');
+                    const asteroid = gltf.scene;
+                    
+                    // Scale: Bennu is ~500m in real life
+                    const baseScale = diameterM / 500;
+                    const visualScale = baseScale * 20;
+                    
+                    console.log('📏 Asteroid scale:', visualScale, 'for diameter:', diameterM);
+                    asteroid.scale.set(visualScale, visualScale, visualScale);
+                    
+                    // Initial rotation
+                    asteroid.rotation.set(0.5, 0.8, 0.3);
+                    
+                    sceneRef.current.add(asteroid);
+                    asteroidRef.current = asteroid;
+
+                    // Position it immediately at impact location
+                    const coords = globeRef.current.getCoords(
+                        impact.lat,
+                        impact.lng,
+                        START_ALTITUDE
+                    );
+                    asteroid.position.set(coords.x, coords.y, coords.z);
+                    console.log('📍 Initial position:', coords);
+
+                    if (onLoaded) {
+                        onLoaded({ asteroid, impact });
+                    }
+                },
+                (progress) => {
+                    if (progress.total > 0) {
+                        const percent = (progress.loaded / progress.total * 100).toFixed(0);
+                        console.log(`Loading asteroid: ${percent}%`);
+                    }
+                },
+                (error) => {
+                    console.error('❌ Failed to load asteroid model:', error);
+                    
+                    // Fallback to visible cube
+                    const cubeSize = 50;
+                    const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+                    const material = new THREE.MeshBasicMaterial({ 
+                        color: 0xff0000,
+                        wireframe: false 
+                    });
+                    const cube = new THREE.Mesh(geometry, material);
+                    
+                    sceneRef.current.add(cube);
+                    asteroidRef.current = cube;
+                    
+                    console.log('⚠️ Using fallback cube');
+                }
+            );
+        }
+    }, [globeRef, impact.lat, impact.lng, diameterM]);
+
+    // Update scale when diameter changes (NEW - this is what was missing!)
+    useEffect(() => {
+        if (!asteroidRef.current) return;
+
+        const baseScale = diameterM / 500;
+        const visualScale = baseScale * 20;
         
-        loader.load(
-            '/models/Bennu.glb',
-            (gltf) => {
-                console.log('✅ Asteroid model loaded successfully');
-                const asteroid = gltf.scene;
-                
-                // Scale: Bennu is ~500m in real life
-                const baseScale = diameterM / 500;
-                const visualScale = baseScale * 20;
-                
-                console.log('📏 Asteroid scale:', visualScale, 'for diameter:', diameterM);
-                asteroid.scale.set(visualScale, visualScale, visualScale);
-                
-                // Initial rotation
-                asteroid.rotation.set(0.5, 0.8, 0.3);
-                
-                sceneRef.current.add(asteroid);
-                asteroidRef.current = asteroid;
-
-                // Position it immediately at impact location
-                const coords = globeRef.current.getCoords(
-                    impact.lat,
-                    impact.lng,
-                    START_ALTITUDE
-                );
-                asteroid.position.set(coords.x, coords.y, coords.z);
-                console.log('📍 Initial position:', coords);
-
-                if (onLoaded) {
-                    onLoaded({ asteroid, impact });
-                }
-            },
-            (progress) => {
-                if (progress.total > 0) {
-                    const percent = (progress.loaded / progress.total * 100).toFixed(0);
-                    console.log(`Loading asteroid: ${percent}%`);
-                }
-            },
-            (error) => {
-                console.error('❌ Failed to load asteroid model:', error);
-                
-                // Fallback to visible cube
-                const cubeSize = 50;
-                const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: 0xff0000,
-                    wireframe: false 
-                });
-                const cube = new THREE.Mesh(geometry, material);
-                
-                sceneRef.current.add(cube);
-                asteroidRef.current = cube;
-                
-                console.log('⚠️ Using fallback cube');
-            }
-        );
-    }
-}, [globeRef, impact.lat, impact.lng, diameterM]); // Only run once when globe is ready
+        asteroidRef.current.scale.set(visualScale, visualScale, visualScale);
+        console.log('📏 Scale updated to:', visualScale, 'for diameter:', diameterM);
+    }, [diameterM]);
 
     // Reposition when impact changes
     useEffect(() => {
-    // Skip if asteroid is still loading or not available
-    if (!asteroidRef.current || !globeRef.current) return;
+        if (!asteroidRef.current || !globeRef.current) return;
 
-    console.log('📍 Repositioning asteroid to:', impact);
+        console.log('📍 Repositioning asteroid to:', impact);
 
-    const coords = globeRef.current.getCoords(
-        impact.lat,
-        impact.lng,
-        START_ALTITUDE
-    );
-    asteroidRef.current.position.set(coords.x, coords.y, coords.z);
-    asteroidRef.current.visible = true;
-}, [impact.lat, impact.lng]);
+        const coords = globeRef.current.getCoords(
+            impact.lat,
+            impact.lng,
+            START_ALTITUDE
+        );
+        asteroidRef.current.position.set(coords.x, coords.y, coords.z);
+        asteroidRef.current.visible = true;
+    }, [impact.lat, impact.lng]);
 
     // Animation function
     const animate = (currentTime) => {
@@ -166,7 +176,7 @@ export default function Asteroid({
                 animationRef.current = null;
             }
         };
-    }, [isAnimating]); // Changed from 'visible' to 'isAnimating'
+    }, [isAnimating]);
 
     return null;
 }

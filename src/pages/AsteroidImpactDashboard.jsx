@@ -12,7 +12,7 @@ import {
 import { ASTEROID_PRESETS } from "../utils/presets";
 import Asteroid from "../components/ui/Asteroid"
 import { useAtom, useSetAtom } from "jotai";
-import { asteroidAnimationAtom, impactAtom } from "../utils/atom";
+import { asteroidAnimationAtom, impactAtom, asteroidParamsAtom } from "../utils/atom";
 
 const ASTEROID_NAME = "Impactor-2025";
 
@@ -21,6 +21,8 @@ export default function AsteroidImpactDashboard() {
     const globeRef = useRef(null);
 
     const [animationState, setAnimationState] = useAtom(asteroidAnimationAtom);
+
+    const setAsteroidParams = useSetAtom(asteroidParamsAtom);
 
     const [leftOpen, setLeftOpen] = useState(true);
     const [rightOpen, setRightOpen] = useState(false);
@@ -239,6 +241,11 @@ export default function AsteroidImpactDashboard() {
         setAnimationState({ visible: true, isAnimating: false });
     };
 
+    const handleDiameterChange = (newDiameter) => {
+    setDiameterM(newDiameter);
+    setAsteroidParams(prev => ({ ...prev, diameterM: newDiameter }));
+};
+
     const saveScenarioA = () => setScenarioA(snapshotScenario("A"));
     const saveScenarioB = () => setScenarioB(snapshotScenario("B"));
     const snapshotScenario = (label) => ({
@@ -320,7 +327,7 @@ export default function AsteroidImpactDashboard() {
 
             <Panel isOpen={leftOpen} from="left" width={320}>
                 <LeftPanel
-                    diameterM={diameterM} setDiameterM={setDiameterM}
+                    diameterM={diameterM} setDiameterM={handleDiameterChange}
                     speedKms={speedKms} setSpeedKms={setSpeedKms}
                     angleDeg={angleDeg} setAngleDeg={setAngleDeg}
                     hexResolution={hexResolution} setHexResolution={setHexResolution}
