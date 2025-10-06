@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import DeckGL from "@deck.gl/react";
 import { MapView } from "@deck.gl/core";
 import { TileLayer } from "@deck.gl/geo-layers";
@@ -8,11 +8,11 @@ import { BitmapLayer, GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 
 function zoomFromRadiusKm(rKm) {
     const z = 12 - Math.log2(Math.max(1, rKm) / 5);
-    return Math.max(2, Math.min(16, Math.round(z))); // Allow zooming out further
+    return Math.max(2, Math.min(16, Math.round(z)));
 }
 
 function circlePolygon([lng, lat], radiusKm, steps = 64) {
-    const R = 6371000; // Earth radius in meters
+    const R = 6371000;
     const d = (radiusKm * 1000) / R;
     const latRad = (lat * Math.PI) / 180;
     const lngRad = (lng * Math.PI) / 180;
@@ -36,6 +36,7 @@ function circlePolygon([lng, lat], radiusKm, steps = 64) {
 /** ---- component ---- **/
 
 function DeckMiniMapImpl({ impact, kpis }) {
+    const deckRef = useRef(null);
 
     const initialViewState = useMemo(() => ({
         longitude: impact.lng,
@@ -47,6 +48,11 @@ function DeckMiniMapImpl({ impact, kpis }) {
 
     const [viewState, setViewState] = useState(initialViewState);
 
+    // Update view when impact changes
+    useMemo(() => {
+        setViewState(initialViewState);
+    }, [initialViewState]);
+
     const handleZoom = useCallback((delta) => {
         setViewState(v => ({
             ...v,
@@ -54,8 +60,7 @@ function DeckMiniMapImpl({ impact, kpis }) {
         }));
     }, []);
 
-
-    const tileLayer = new TileLayer({
+    const tileLayer = useMemo(() => new TileLayer({
         id: 'basemap-tile-layer',
         data: 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
         minZoom: 0,
@@ -72,7 +77,7 @@ function DeckMiniMapImpl({ impact, kpis }) {
                 bounds: [west, south, east, north]
             });
         }
-    });
+    }), []);
 
     const ringsLayer = useMemo(() => {
         const feats = [
@@ -114,8 +119,10 @@ function DeckMiniMapImpl({ impact, kpis }) {
     return (
         <div className="w-full h-full relative">
             <DeckGL
+                ref={deckRef}
                 views={[new MapView({ id: "mini", controller: true })]}
                 initialViewState={initialViewState}
+                viewState={viewState}
                 onViewStateChange={({ viewState: vs }) => setViewState(vs)}
                 controller={{ scrollZoom: true, dragPan: true, dragRotate: false, touchRotate: false, doubleClickZoom: true }}
                 layers={[tileLayer, ringsLayer, impactLayer]}
@@ -140,7 +147,7 @@ function DeckMiniMapImpl({ impact, kpis }) {
     );
 }
 
-// --- wrapper to force re-mount on impact change ---
+// Remove the remounting wrapper - just use stable key
 export default function DeckMiniMap(props) {
-    return <DeckMiniMapImpl key={`${props.impact.lat}-${props.impact.lng}-${props.kpis.light}`} {...props} />;
+    return <DeckMiniMapImpl key="deck-minimap-stable" {...props} />;
 }
